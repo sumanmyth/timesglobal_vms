@@ -1,0 +1,6 @@
+{
+  "name": "Times Global VMS",
+  "description": "A Visitor Management System for Times Global Data Centre, featuring login, registration, and a dashboard with management modules. Styled with a modern red and black theme using Tailwind CSS.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

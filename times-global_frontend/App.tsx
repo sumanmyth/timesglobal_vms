@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'; // useNavigate removed as it's not directly used here but in child components
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import DashboardPage from './components/DashboardPage';
@@ -10,9 +11,9 @@ import VMSHomePage from './components/vms/VMSHomePage';
 import VMSAddRecordPage from './components/vms/VMSAddRecordPage';
 import VMSVisitorListPage from './components/vms/VMSVisitorListPage';
 import VMSReportsPage from './components/vms/VMSReportsPage';
-import VMSAddImagePage from './components/vms/VMSAddImagePage';
+import VMSUserRegistrationPage from './components/vms/VMSUserRegistrationPage'; 
 import VMSAddDocumentPage from './components/vms/VMSAddDocumentPage';
-import VMSRegisterUserPage from './components/vms/VMSRegisterUserPage';
+// VMSRegisterUserPage (placeholder) is removed as its functionality is merged
 import { getAuthToken, removeAuthToken } from './services/tokenService';
 
 const App: React.FC = () => {
@@ -28,15 +29,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleLoginSuccess = useCallback(() => {
-    // Token is set by LoginPage, this just updates the app's auth state
     setIsAuthenticated(true);
   }, []);
 
   const handleLogout = useCallback(() => {
     removeAuthToken();
-    localStorage.removeItem('username'); // Clear stored username
+    localStorage.removeItem('username');
     setIsAuthenticated(false);
-    // Navigation to /login will be handled by the Routes logic due to isAuthenticated changing
   }, []);
   
 
@@ -56,7 +55,6 @@ const App: React.FC = () => {
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} 
         />
         
-        {/* Main Dashboard Route */}
         <Route 
           path="/dashboard" 
           element={isAuthenticated ? <DashboardPage onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
@@ -70,7 +68,6 @@ const App: React.FC = () => {
           element={isAuthenticated ? <GatePassForm onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
         />
 
-        {/* VMS Section Routes */}
         <Route 
           path="/vms" 
           element={isAuthenticated ? <VMSDashboardLayout onLogout={handleLogout} /> : <Navigate to="/login" replace />}
@@ -80,9 +77,10 @@ const App: React.FC = () => {
           <Route path="add-record" element={<VMSAddRecordPage />} />
           <Route path="visitor-list" element={<VMSVisitorListPage />} />
           <Route path="reports" element={<VMSReportsPage />} />
-          <Route path="add-image" element={<VMSAddImagePage />} />
+          {/* Path for "Register User" */}
+          <Route path="add-image" element={<VMSUserRegistrationPage />} /> 
           <Route path="add-document" element={<VMSAddDocumentPage />} />
-          <Route path="register-user" element={<VMSRegisterUserPage />} />
+          {/* Removed old /vms/register-user route */}
         </Route>
 
         <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />

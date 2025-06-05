@@ -7,3 +7,5 @@ django-cors-headers>=3.10,<4.4
 django-filter>=23.2,<25.0 # Added this line
 # For production, consider adding gunicorn or uvicorn
 # Example: gunicorn>=20.0,<21.0
+
+

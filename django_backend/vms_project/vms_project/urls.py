@@ -7,8 +7,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('users.urls')),
     path('api/visitors/', include('visitors.urls')),
-    path('api/', include('forms_module.urls')), # for /device-storage/ and /gate-passes/
+    path('api/', include('forms_module.urls')),
     path('api/images/', include('images.urls')),
+    path('api/task-management/', include('task_management.urls')),
 ]
 
 # Serve media files during development

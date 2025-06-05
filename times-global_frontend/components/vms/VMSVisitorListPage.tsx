@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Input from '../common/Input';
 import Button from '../common/Button';
@@ -10,6 +11,12 @@ interface Visitor {
   fullName: string;
   checkInTime: string;
   checkOutTime?: string | null;
+  contact?: string;
+  email?: string;
+  reason?: string;
+  approvedBy?: string;
+  requestedBy?: string;
+  requestSource?: string;
 }
 
 interface StoredImage {
@@ -28,48 +35,90 @@ const VMSVisitorListPage: React.FC = () => {
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [searchName, setSearchName] = useState<string>('');
+  
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [todaysVisitors, setTodaysVisitors] = useState<Visitor[]>([]);
+  const [isLoadingTodaysVisitors, setIsLoadingTodaysVisitors] = useState<boolean>(true);
+  const [todaysVisitorsError, setTodaysVisitorsError] = useState<string | null>(null);
+
+  const [selectedVisitorForHistory, setSelectedVisitorForHistory] = useState<Visitor | null>(null);
+  const [visitorHistory, setVisitorHistory] = useState<Visitor[]>([]);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+
   const handleDateFromChange = (e: React.ChangeEvent<HTMLInputElement>) => setDateFrom(e.target.value);
   const handleDateToChange = (e: React.ChangeEvent<HTMLInputElement>) => setDateTo(e.target.value);
   const handleSearchNameChange = (e: React.ChangeEvent<HTMLInputElement>) => setSearchName(e.target.value);
+  
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    e.currentTarget.src = 'https://via.placeholder.com/40/CCCCCC/FFFFFF?Text=Error';
+    e.currentTarget.src = 'https://via.placeholder.com/40/CCCCCC/FFFFFF?Text=NoImg';
   };
+
+  const enrichVisitorsWithImages = async (visitorList: Visitor[]): Promise<Visitor[]> => {
+    return Promise.all(
+      visitorList.map(async (visitor: Visitor) => {
+        if (!visitor.visitorImage && visitor.fullName) { 
+          try {
+            const imageData = await apiService.get<StoredImage[] | ApiResponse<StoredImage>>(`/images/?search=${encodeURIComponent(visitor.fullName)}`);
+            const images: StoredImage[] = Array.isArray(imageData) ? imageData : (imageData.results || []);
+            if (images.length > 0 && images[0].imageFile) {
+              return { ...visitor, visitorImage: images[0].imageFile };
+            }
+          } catch (imgError) {
+            console.warn(`Could not fetch image for ${visitor.fullName}:`, imgError);
+          }
+        }
+        return visitor;
+      })
+    );
+  };
+
+  const fetchTodaysVisitors = useCallback(async () => {
+    setIsLoadingTodaysVisitors(true);
+    setTodaysVisitorsError(null);
+    try {
+      const today = new Date();
+      const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+
+      let queryParams = new URLSearchParams();
+      queryParams.append('check_in_time_after', todayStart);
+      queryParams.append('check_in_time_before', todayEnd);
+      
+      const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
+      let fetchedTodaysVisitors: Visitor[] = Array.isArray(data) ? data : (data.results || []);
+      
+      const visitorsWithImages = await enrichVisitorsWithImages(fetchedTodaysVisitors);
+      setTodaysVisitors(visitorsWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));
+    } catch (err: any) {
+      console.error('Fetch Today\'s Visitors Error:', err);
+      setTodaysVisitorsError(err.message || 'Failed to fetch today\'s visitor list.');
+      setTodaysVisitors([]);
+    } finally {
+      setIsLoadingTodaysVisitors(false);
+    }
+  }, []);
 
   const fetchVisitors = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       let queryParams = new URLSearchParams();
-      if (dateFrom) queryParams.append('check_in_time_after', dateFrom); 
-      if (dateTo) queryParams.append('check_in_time_before', dateTo);   
+      if (dateFrom) queryParams.append('check_in_time_after', dateFrom + "T00:00:00Z"); 
+      if (dateTo) queryParams.append('check_in_time_before', dateTo + "T23:59:59Z");   
       if (searchName) queryParams.append('search', searchName); 
 
       const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
       let fetchedVisitors: Visitor[] = Array.isArray(data) ? data : (data.results || []);
-
-      const visitorsWithImages: Visitor[] = await Promise.all(
-        fetchedVisitors.map(async (visitor: Visitor) => {
-          if (!visitor.visitorImage && visitor.fullName) { 
-            try {
-              const imageData = await apiService.get<StoredImage[] | ApiResponse<StoredImage>>(`/images/?search=${encodeURIComponent(visitor.fullName)}`);
-              const images: StoredImage[] = Array.isArray(imageData) ? imageData : (imageData.results || []);
-              if (images.length > 0 && images[0].imageFile) {
-                return { ...visitor, visitorImage: images[0].imageFile };
-              }
-            } catch (imgError) {
-              console.warn(`Could not fetch image for ${visitor.fullName}:`, imgError);
-            }
-          }
-          return visitor;
-        })
-      );
-      setVisitors(visitorsWithImages);
-
-    } catch (err: any) {
+      
+      const visitorsWithImages = await enrichVisitorsWithImages(fetchedVisitors);
+      setVisitors(visitorsWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));
+    } catch (err: any) { 
       console.error('Fetch Visitors Error:', err);
       setError(err.message || 'Failed to fetch visitor list.');
       setVisitors([]);
@@ -79,23 +128,25 @@ const VMSVisitorListPage: React.FC = () => {
   }, [dateFrom, dateTo, searchName]);
 
   useEffect(() => {
-    fetchVisitors();
-  }, [fetchVisitors]);
+    fetchTodaysVisitors();
+    fetchVisitors(); 
+  }, [fetchTodaysVisitors, fetchVisitors]);
 
-  const handleFilterByDate = () => {
-    fetchVisitors();
-  };
-
-  const handleSearchByName = () => {
-    fetchVisitors();
-  };
+  const handleFilterByDate = () => fetchVisitors();
+  const handleSearchByName = () => fetchVisitors();
 
   const handleCheckOut = async (visitorId: string) => {
     if (!window.confirm('Are you sure you want to check out this visitor?')) return;
     try {
       const updatedVisitor = await apiService.patch<Visitor>(`/visitors/${visitorId}/checkout/`, {}); 
+      
       setVisitors((prevVisitors: Visitor[]) => 
         prevVisitors.map((v: Visitor) => v.id === visitorId ? { ...v, checkOutTime: updatedVisitor.checkOutTime } : v)
+      );
+      setTodaysVisitors((prevTodays: Visitor[]) =>
+        prevTodays.map(tv =>
+          tv.id === visitorId ? { ...tv, checkOutTime: updatedVisitor.checkOutTime } : tv
+        )
       );
       alert('Visitor checked out successfully.');
     } catch (err: any) {
@@ -103,102 +154,213 @@ const VMSVisitorListPage: React.FC = () => {
       alert(`Failed to check out visitor: ${err.message || err.detail}`);
     }
   };
-  
-  const handleAction = (visitorId: string, action: string) => {
-    console.log(`Action: ${action} for visitor ID: ${visitorId}`);
-    if (action === 'Check-Out') {
-        handleCheckOut(visitorId);
-    } else {
-        alert(`Action '${action}' not fully implemented yet.`);
+
+  const handleViewHistory = async (visitor: Visitor) => {
+    setSelectedVisitorForHistory(visitor);
+    setIsHistoryModalOpen(true);
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+    setVisitorHistory([]);
+    try {
+      const queryParams = new URLSearchParams({ search: visitor.fullName });
+      const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
+      let historyEntries: Visitor[] = Array.isArray(data) ? data : (data.results || []);
+
+      const historyWithImages = await enrichVisitorsWithImages(historyEntries);
+      setVisitorHistory(historyWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));
+    } catch (err: any) {
+      console.error('Fetch Visitor History Error:', err);
+      setHistoryError(err.message || 'Failed to fetch visitor history.');
+    } finally {
+      setIsLoadingHistory(false);
     }
+  };
+
+  const handleCloseHistoryModal = () => {
+    setIsHistoryModalOpen(false);
+    setSelectedVisitorForHistory(null);
+    setVisitorHistory([]);
+    setHistoryError(null);
   };
   
   const inputDarkStyle = "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400 focus:ring-red-500 focus:border-red-500 !py-2";
-  const filterButtonSmallStyle = "!px-3 !py-1 text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 border border-gray-500";
-  const labelStyles = "block text-sm font-medium text-gray-300 mb-1";
+  const labelStyles = "block text-xs font-medium text-gray-300 mb-1";
 
-  const formatDate = (isoString?: string | null) => {
+  const formatDate = (isoString?: string | null, includeTime: boolean = true) => {
     if (!isoString) return 'N/A';
     try {
-      return new Date(isoString).toLocaleString();
+      const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+      };
+      if (includeTime) {
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+        options.second = '2-digit';
+        options.hour12 = true;
+      }
+      return new Date(isoString).toLocaleString(undefined, options);
     } catch {
       return isoString; 
     }
   };
 
-  return (
-    <div className="flex flex-col h-full bg-gray-900">
-      <div className="bg-red-700 text-white p-3 shadow-md">
-        <h2 className="text-xl font-semibold text-center">Visitor List</h2>
-      </div>
+  const renderVisitorTable = (visitorList: Visitor[], listType: 'today' | 'historical') => {
+    if (!visitorList || visitorList.length === 0) {
+      return <p className="px-3 py-10 text-center text-sm text-gray-400">No visitors found{listType === 'historical' && (searchName || dateFrom || dateTo) ? ' for the current filters' : ''}.</p>;
+    }
+    return (
+      <table className="min-w-full divide-y divide-gray-700">
+        <thead className="bg-gray-700">
+          <tr>
+            <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Image</th>
+            <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">ID Number/Type</th>
+            <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Full Name</th>
+            <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Reason</th>
+            <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Check-In Time</th>
+            <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Check-Out Time</th>
+            <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="bg-gray-800 divide-y divide-gray-700">
+          {visitorList.map((visitor: Visitor) => (
+            <tr key={`${listType}-${visitor.id}`} className="hover:bg-gray-700/50 transition-colors">
+              <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap">
+                {visitor.visitorImage ? (
+                  <img className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover" src={visitor.visitorImage} alt={visitor.fullName} onError={handleImageError} />
+                ) : (
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gray-600 flex items-center justify-center text-gray-400 text-xs">NoImg</div>
+                )}
+              </td>
+              <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300">{visitor.idNumberType}</td>
+              <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs font-medium text-gray-100">{visitor.fullName}</td>
+              <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300 truncate max-w-[100px] sm:max-w-[150px]" title={visitor.reason || undefined}>{visitor.reason || 'N/A'}</td>
+              <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300">{formatDate(visitor.checkInTime)}</td>
+              <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300">{formatDate(visitor.checkOutTime)}</td>
+              <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs font-medium">
+                <button onClick={() => handleViewHistory(visitor)} className="text-red-400 hover:text-red-300 mr-1 sm:mr-2 transition-colors">View</button>
+                {!visitor.checkOutTime && (
+                     <button onClick={() => handleCheckOut(visitor.id)} className="text-blue-400 hover:text-blue-300 transition-colors">Check-Out</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
 
-      <div className="p-4 m-4 bg-gray-800 rounded-lg shadow border border-gray-700">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-          <div className="flex items-end space-x-2">
-            <div>
-              <label htmlFor="dateFrom" className={labelStyles}>Date From:</label>
-              <Input type="date" id="dateFrom" value={dateFrom} onChange={handleDateFromChange} className={inputDarkStyle} />
+  return (
+    <div className="flex flex-col h-full">
+      <div className="bg-red-700 bg-opacity-75 backdrop-blur-sm text-white p-3 shadow-md">
+        <h2 className="text-xl font-semibold text-center">Visitor List & Management</h2>
+      </div>
+      
+      <div className="flex-grow p-2 md:p-3 overflow-y-auto">
+        {/* Today's Visitors Section */}
+        <div className="mb-3 bg-slate-700 bg-opacity-60 backdrop-blur-md rounded-lg shadow border border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-100 p-2 sm:p-3 border-b border-gray-700">Today's Visitors</h3>
+          {isLoadingTodaysVisitors && <p className="p-3 text-center text-gray-300">Loading today's visitors...</p>}
+          {todaysVisitorsError && <p role="alert" aria-live="assertive" className="p-3 text-center text-red-400 bg-red-900/50 rounded m-2">{todaysVisitorsError}</p>}
+          {!isLoadingTodaysVisitors && !todaysVisitorsError && (
+            <div className="overflow-x-auto">
+              {renderVisitorTable(todaysVisitors, 'today')}
             </div>
-            <div>
-              <label htmlFor="dateTo" className={labelStyles}>Date To:</label>
-              <Input type="date" id="dateTo" value={dateTo} onChange={handleDateToChange} className={inputDarkStyle} />
+          )}
+        </div>
+
+        <hr className="border-gray-600 my-2 sm:my-3" />
+
+        {/* Historical / Filtered Visitor List Section */}
+        <div className="mb-3 p-2 sm:p-3 bg-slate-700 bg-opacity-60 backdrop-blur-md rounded-lg shadow border border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-100 mb-2 sm:mb-3">Search Visitor Log</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3 items-end">
+            <div className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-2 md:items-end lg:col-span-2">
+              <div className="w-full md:w-auto flex-1">
+                <label htmlFor="dateFrom" className={labelStyles}>Date From:</label>
+                <Input type="date" id="dateFrom" value={dateFrom} onChange={handleDateFromChange} className={`${inputDarkStyle} w-full`} />
+              </div>
+              <div className="w-full md:w-auto flex-1">
+                <label htmlFor="dateTo" className={labelStyles}>Date To:</label>
+                <Input type="date" id="dateTo" value={dateTo} onChange={handleDateToChange} className={`${inputDarkStyle} w-full`} />
+              </div>
+              <Button onClick={handleFilterByDate} className="!px-3 md:!px-4 !py-2 text-sm w-full md:w-auto md:self-end">Filter by Date</Button>
             </div>
-            <Button onClick={handleFilterByDate} className={`${filterButtonSmallStyle} self-end mb-0.5`}>Filter by Date</Button>
+            <div className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-2 md:items-end">
+              <div className="w-full md:w-auto flex-grow">
+                <label htmlFor="searchName" className={labelStyles}>Search by Full Name:</label>
+                <Input type="text" id="searchName" placeholder="Enter full name" value={searchName} onChange={handleSearchNameChange} className={`${inputDarkStyle} w-full`} />
+              </div>
+              <Button onClick={handleSearchByName} className="!px-3 md:!px-4 !py-2 text-sm w-full md:w-auto md:self-end">Search by Name</Button>
+            </div>
           </div>
-          <div className="flex items-end space-x-2">
-            <div className="flex-grow">
-              <label htmlFor="searchName" className={labelStyles}>Search by Full Name:</label>
-              <Input type="text" id="searchName" placeholder="Enter full name" value={searchName} onChange={handleSearchNameChange} className={inputDarkStyle + " w-full"} />
+        </div>
+        
+        <div className="overflow-x-auto">
+          {isLoading && <p className="p-4 text-center text-gray-300">Loading filtered visitors...</p>}
+          {error && <p role="alert" aria-live="assertive" className="p-4 text-center text-red-400 bg-red-900/50 rounded m-2">{error}</p>}
+          {!isLoading && !error && (
+            <div className="bg-slate-700 bg-opacity-60 backdrop-blur-md shadow-md rounded-lg overflow-hidden border border-gray-700">
+              {renderVisitorTable(visitors, 'historical')}
             </div>
-            <Button onClick={handleSearchByName} className={`${filterButtonSmallStyle} self-end mb-0.5`}>Search by Name</Button>
-          </div>
+          )}
         </div>
       </div>
 
-      {isLoading && <p className="p-4 text-center text-gray-300">Loading visitors...</p>}
-      {error && <p role="alert" aria-live="assertive" className="p-4 text-center text-red-400 bg-red-900/50 rounded m-4">{error}</p>}
-      
-      {!isLoading && !error && (
-        <div className="flex-grow p-4 overflow-x-auto">
-          <div className="bg-gray-800 shadow-md rounded-lg overflow-hidden border border-gray-700">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-gray-700">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Image</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">ID Number/type</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Full Name</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Check-In Time</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Check-Out Time</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {visitors.length > 0 ? visitors.map((visitor: Visitor) => (
-                  <tr key={visitor.id} className="hover:bg-gray-700 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {visitor.visitorImage ? (
-                        <img className="h-10 w-10 rounded-full object-cover" src={visitor.visitorImage} alt={visitor.fullName} 
-                             onError={handleImageError} />
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center text-gray-400 text-xs">No Img</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">{visitor.idNumberType}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-100">{visitor.fullName}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">{formatDate(visitor.checkInTime)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">{formatDate(visitor.checkOutTime)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                      <button onClick={() => handleAction(visitor.id, 'View')} className="text-red-400 hover:text-red-300 mr-2 transition-colors">View</button>
-                      {!visitor.checkOutTime && (
-                           <button onClick={() => handleAction(visitor.id, 'Check-Out')} className="text-blue-400 hover:text-blue-300 transition-colors">Check-Out</button>
-                      )}
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">No visitors found.</td></tr>
+
+      {/* Visitor History Modal */}
+      {isHistoryModalOpen && selectedVisitorForHistory && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-2 z-50"
+          onClick={handleCloseHistoryModal} 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="visitorHistoryModalTitle"
+        >
+          <div 
+            className="bg-slate-800 p-3 sm:p-4 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()} 
+          >
+            <div className="flex justify-between items-center mb-2 sm:mb-3">
+              <h3 id="visitorHistoryModalTitle" className="text-md sm:text-lg font-semibold text-red-500">
+                Visit History for: {selectedVisitorForHistory.fullName}
+              </h3>
+              <Button onClick={handleCloseHistoryModal} variant="secondary" className="!p-1 sm:!p-1.5 text-lg sm:text-xl leading-none">&times;</Button>
+            </div>
+            {isLoadingHistory && <p className="text-center text-gray-300 py-4">Loading history...</p>}
+            {historyError && <p role="alert" className="text-center text-red-400 bg-red-900/50 p-3 rounded my-2">{historyError}</p>}
+            {!isLoadingHistory && !historyError && (
+              <div className="overflow-y-auto flex-grow">
+                {visitorHistory.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-700">
+                      <thead className="bg-gray-700">
+                        <tr>
+                          <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Check-In Time</th>
+                          <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Check-Out Time</th>
+                          <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Reason</th>
+                          <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Approved By</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-gray-800 divide-y divide-gray-700">
+                        {visitorHistory.map(entry => (
+                          <tr key={`hist-${entry.id}`} className="hover:bg-gray-700/50">
+                            <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300">{formatDate(entry.checkInTime)}</td>
+                            <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300">{formatDate(entry.checkOutTime)}</td>
+                            <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300 truncate max-w-[100px] sm:max-w-xs" title={entry.reason || undefined}>{entry.reason || 'N/A'}</td>
+                            <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300">{entry.approvedBy || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-400 py-4">No visit history found for this visitor.</p>
                 )}
-              </tbody>
-            </table>
+              </div>
+            )}
+            <div className="mt-3 sm:mt-4 text-right">
+              <Button onClick={handleCloseHistoryModal} variant="secondary" className="!px-3 !py-1.5 text-sm">Close</Button>
+            </div>
           </div>
         </div>
       )}

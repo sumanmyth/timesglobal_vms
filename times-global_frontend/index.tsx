@@ -1,19 +1,17 @@
-
-// Fallback global JSX declaration to attempt to resolve TS7026.
-// This should ideally not be needed if React 19's types are correctly picked up.
+// THIS MUST BE AT THE VERY TOP
 declare global {
   namespace JSX {
     interface IntrinsicElements {
-      // This allows any string as a tag name and any props.
-      // It sacrifices type safety for intrinsic elements but resolves the error.
       [elemName: string]: any;
     }
-    // You might also need these if further JSX-related type errors appear,
-    // though IntrinsicElements is usually the main one for ts(7026).
-    // interface ElementAttributesProperty { props: {}; } 
-    // interface ElementChildrenAttribute { children: {}; }
   }
 }
+
+// Minimal module declarations to help TS recognize these modules from esm.sh
+// This attempts to resolve TS7016.
+declare module 'react';
+declare module 'react-dom/client';
+declare module 'react/jsx-runtime'; // If using automatic JSX runtime
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';

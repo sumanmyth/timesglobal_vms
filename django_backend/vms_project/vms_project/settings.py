@@ -14,7 +14,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-your-default-s
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1'] # Add your production domain here
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.55.61','192.168.1.71'] # Add your production domain here
 
 
 # Application definition
@@ -31,12 +31,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'django_filters',
 
     # Local apps
     'users.apps.UsersConfig',
     'visitors.apps.VisitorsConfig',
     'forms_module.apps.FormsModuleConfig',
     'images.apps.ImagesConfig',
+    'task_management.apps.TaskManagementConfig', 
 ]
 
 MIDDLEWARE = [
@@ -190,15 +192,23 @@ SIMPLE_JWT = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-     "http://localhost:5173", # Your React frontend development server
-    # Add other origins if needed, e.g., your production frontend URL
-]
-# CORS_ALLOW_ALL_ORIGINS = True # For development only, be more specific in production
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:3000", 
+#     "http://127.0.0.1:3000", 
+#     "http://192.168.55.61:3000",
+#     "http://192.168.55.61:5173",
+#     "http://192.168.1.71:5173"
+# ]
+CORS_ALLOW_ALL_ORIGINS = True # For development only, be more specific in production
 
 CORS_ALLOW_CREDENTIALS = True
 
 # Optional: Allow specific headers and methods if needed
 # CORS_ALLOW_HEADERS = list(default_headers) + ['my-custom-header']
 # CORS_ALLOW_METHODS = list(default_methods) + ['OPTIONS']
+
+CORS_ALLOW_HEADERS = [
+    'authorization',
+    'content-type',
+    # Add any other custom headers your frontend might send
+]

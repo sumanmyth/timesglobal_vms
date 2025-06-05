@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react'; 
 import { useNavigate } from 'react-router-dom'; 
 import DashboardCard from './common/DashboardCard';
@@ -80,80 +81,103 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
-      <header className="bg-gray-800 shadow-lg p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-red-600">Times Global</h1>
-            <p className="text-gray-400 text-sm">Management Software</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            {usernameDisplay && (
-              <span className="text-gray-300 text-sm">
-                Welcome, {usernameDisplay}
-              </span>
-            )}
-            <Button onClick={onLogout} variant="secondary">
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div 
+      className="relative text-gray-100" // Main background container
+      style={{ 
+        backgroundImage: "url('/images/bgdatacenter.jpeg')", 
+        backgroundSize: 'cover', 
+        backgroundPosition: 'center', 
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed' 
+      }}
+    >
+      {/* Page-level blur overlay */}
+      <div className="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-md z-0"></div>
 
-      <main className="flex-grow container mx-auto p-6 md:p-8">
-        <h2 className="text-3xl font-semibold text-gray-100 mb-8 text-center md:text-left">Dashboard Modules</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {dashboardItems.map((item: DashboardItem) => (
-            <DashboardCard
-              key={item.id}
-              title={item.title}
-              icon={item.icon}
-              onClick={() => handleCardClick(item.id, item.title)}
+      {/* Content wrapper on top of the blur */}
+      <div className="relative z-10 min-h-screen flex flex-col">
+        <header className="bg-slate-800 bg-opacity-70 backdrop-blur-sm shadow-lg p-4">
+          <div className="container mx-auto flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-red-600">Times Global</h1>
+              <p className="text-gray-300 text-sm">Management Software</p> 
+            </div>
+            <div className="flex items-center space-x-4">
+              {usernameDisplay && (
+                <span className="text-gray-200 text-sm"> 
+                  Welcome, {usernameDisplay}
+                </span>
+              )}
+              <Button onClick={onLogout} variant="secondary" className="bg-opacity-80"> 
+                Logout
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-grow container mx-auto p-6 md:p-8">
+          <h2 className="text-3xl font-semibold text-gray-100 mb-8 text-center md:text-left">Dashboard Modules</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {dashboardItems.map((item: DashboardItem) => (
+              <DashboardCard
+                key={item.id}
+                title={item.title}
+                icon={item.icon}
+                onClick={() => handleCardClick(item.id, item.title)}
+              />
+            ))}
+          </div>
+          {/* Times Global Logo added here */}
+          <div className="mt-16 mb-8 flex justify-center"> 
+            <img 
+              src="/images/Times Global.png" 
+              alt="Times Global Logo" 
+              className="h-40 w-auto" // Adjusted height for visibility
             />
-          ))}
-        </div>
-      </main>
+          </div>
+        </main>
 
-      <footer className="bg-gray-800 py-8 px-4 text-gray-400">
-        <div className="container mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
-          <div className="flex items-center justify-center md:justify-start space-x-4">
-            <a 
-              href="https://www.facebook.com/profile.php?id=61569411427618" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              aria-label="Times Global on Facebook"
-              className="text-gray-400 hover:text-red-500 transition-colors"
-            >
-              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
-              </svg>
-            </a>
-            <a 
-              href="https://www.linkedin.com/company/timesglobal/posts/?feedView=all" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              aria-label="Times Global on LinkedIn"
-              className="text-gray-400 hover:text-red-500 transition-colors"
-            >
-              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path fillRule="evenodd" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" clipRule="evenodd" />
-              </svg>
-            </a>
-          </div>
-          <div className="text-center md:text-left text-sm">
-            <p>
-              <a href="http://timesglobal.com.np" target="_blank" rel="noopener noreferrer" className="hover:text-red-500 transition-colors">
-                timesglobal.com.np
+        <footer className="bg-slate-800 bg-opacity-70 backdrop-blur-sm py-8 px-4 text-gray-300 mt-auto"> 
+          <div className="container mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+            <div className="flex items-center justify-center md:justify-start space-x-4">
+              <a 
+                href="https://www.facebook.com/profile.php?id=61569411427618" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                aria-label="Times Global on Facebook"
+                className="text-gray-300 hover:text-red-500 transition-colors" 
+              >
+                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
+                </svg>
               </a>
-            </p>
-            <p>Phone: +977-9851020982</p>
-            <p>Address: Dhumbarai, Kathmandu, Nepal</p>
+              <a 
+                href="https://www.linkedin.com/company/timesglobal/posts/?feedView=all" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                aria-label="Times Global on LinkedIn"
+                className="text-gray-300 hover:text-red-500 transition-colors" 
+              >
+                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fillRule="evenodd" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" clipRule="evenodd" />
+                </svg>
+              </a>
+            </div>
+            <div className="text-center md:text-left text-sm">
+              <p>
+                <a href="http://timesglobal.com.np" target="_blank" rel="noopener noreferrer" className="hover:text-red-500 transition-colors">
+                  timesglobal.com.np
+                </a>
+              </p>
+              <p>Phone: +977-9851020982</p>
+              <p>Address: Dhumbarai, Kathmandu, Nepal</p>
+            </div>
+            <div className="text-center md:text-right text-sm">
+              <p>© {new Date().getFullYear()} Times Global Data Centre. <br className="sm:hidden"/>All rights reserved.</p>
+            </div>
           </div>
-          <div className="text-center md:text-right text-sm">
-            <p>© {new Date().getFullYear()} Times Global Data Centre. <br className="sm:hidden"/>All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 };

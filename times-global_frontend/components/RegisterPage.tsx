@@ -45,7 +45,7 @@ const RegisterPage: React.FC = () => {
         last_name: fullName.split(' ').slice(1).join(' ') || '',
       };
 
-      console.log("Attempting to register with data:", registrationData); 
+      // console.log("Attempting to register with data:", registrationData); // Removed this line
 
       await apiService.post('/auth/register/', registrationData);
       alert('Registration successful! Please log in.');

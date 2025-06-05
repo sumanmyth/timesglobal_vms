@@ -74,6 +74,8 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
       navigate('/dashboard/device-storage');
     } else if (id === 'gate-pass') {
       navigate('/dashboard/gate-pass');
+    } else if (id === 'task-management') {
+      navigate('/task-management/home');
     }
      else {
       alert(`Navigating to ${title} (ID: ${id}) - Feature not implemented yet.`);

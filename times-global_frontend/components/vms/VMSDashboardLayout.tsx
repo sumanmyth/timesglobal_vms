@@ -176,7 +176,7 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
             <img
               src="/images/Times Global.png"
               alt="Times Global Logo"
-              className="h-16 w-auto" 
+              className="h-22 w-auto" 
             />
           </div>
 

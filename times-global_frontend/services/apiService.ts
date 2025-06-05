@@ -3,7 +3,7 @@
 import { getAuthToken, setAuthToken, getRefreshToken, removeAuthToken } from './tokenService';
 
 // Updated BASE_URL with your network IP
-const BASE_URL = 'http://192.168.55.61:8000/api'; 
+const BASE_URL = 'http://192.168.1.71:8000/api'; 
 
 interface ApiErrorData {
   detail?: string;

@@ -1,16 +1,23 @@
+# <<<< START OF FILE users/models.py >>>>
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+# Ensure locations.Location can be referenced. If locations app is defined, this is fine.
+# from locations.models import Location # Direct import if needed, or string reference
 
 class User(AbstractUser):
-    # Add any additional fields here if needed, e.g.:
-    # phone_number = models.CharField(max_length=15, blank=True, null=True)
-    # profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
-    
-    # Make email unique and required for registration logic
     email = models.EmailField(unique=True)
+    is_approved_by_admin = models.BooleanField(default=False, help_text="Designates whether the user's dashboard access is approved by an admin.")
+    authorized_locations = models.ManyToManyField(
+        'locations.Location', 
+        blank=True,
+        related_name='authorized_users',
+        help_text="Locations this user is authorized to access data for."
+    )
 
-    #USERNAME_FIELD = 'email' # If you want to log in with email instead of username
-    #REQUIRED_FIELDS = ['username'] # If USERNAME_FIELD is 'email', then 'username' might go here if still used
+    # USERNAME_FIELD = 'email' # If you want to log in with email
+    # REQUIRED_FIELDS = ['username'] # If USERNAME_FIELD is 'email'
 
     def __str__(self):
         return self.username
+
+# <<<< END OF FILE users/models.py >>>>

@@ -1,4 +1,3 @@
-
 import React, { useState, ChangeEvent, FormEvent, useEffect, useCallback } from 'react';
 import Input from '../common/Input';
 import Button from '../common/Button';
@@ -67,7 +66,7 @@ const VMSUserRegistrationPage: React.FC = () => {
       const queryParams = new URLSearchParams();
       if (searchTerm) queryParams.append('search', searchTerm);
       const data = await apiService.get<RegisteredUser[] | ApiResponse<RegisteredUser>>(`/images/?${queryParams.toString()}`);
-      setRegisteredUsers(Array.isArray(data) ? data : (data.results || []));
+      setRegisteredUsers(Array.isArray(data) ? data : (data?.results || []));
     } catch (err: any) {
       console.error('Fetch Registered Users Error:', err);
       setTableError(err.data?.detail || err.message || 'Failed to fetch registered users.');
@@ -156,6 +155,7 @@ const VMSUserRegistrationPage: React.FC = () => {
       setEditImagePreviewUrl(URL.createObjectURL(file)); 
     } else {
       setEditSelectedFile(null);
+      // If file selection is cancelled, revert to original image of the editing user
       setEditImagePreviewUrl(editingUser ? editingUser.imageFile : null); 
     }
   };
@@ -182,9 +182,31 @@ const VMSUserRegistrationPage: React.FC = () => {
     }
 
     try {
-      const updatedUser = await apiService.patch<RegisteredUser>(`/images/${editingUser.id}/`, formData, true);
-      setRegisteredUsers(prevUsers => 
-        prevUsers.map(u => u.id === editingUser.id ? { ...updatedUser, imageFile: updatedUser.imageFile || editingUser.imageFile } : u)
+      const updatedUserResponse = await apiService.patch<RegisteredUser>(`/images/${editingUser.id}/`, formData, true);
+      setRegisteredUsers(prevUsers =>
+        prevUsers.map(u => {
+          if (u.id === editingUser!.id) {
+            // If API returned the full updated object, use it.
+            if (updatedUserResponse) {
+              return updatedUserResponse;
+            } else {
+              // If API returned 204 (updatedUserResponse is undefined),
+              // construct the new state using submitted form data.
+              // For imageFile, if a new one was uploaded but API gave 204,
+              // we don't have the new server URL. Safest is to use the old one
+              // or expect a list refresh will show the correct one.
+              return {
+                id: editingUser!.id, // ID is immutable
+                fullName: editFullName,
+                idType: editIdType,
+                contact: editContact || undefined,
+                email: editEmail || undefined,
+                imageFile: editingUser!.imageFile, // Fallback to original image if API doesn't return one
+              };
+            }
+          }
+          return u;
+        })
       );
       setIsEditModalOpen(false);
       setEditingUser(null);
@@ -267,15 +289,15 @@ const VMSUserRegistrationPage: React.FC = () => {
           </form>
         </section>
 
-        <section className="bg-slate-700 bg-opacity-60 backdrop-blur-md p-0 rounded-lg shadow border border-gray-700 overflow-hidden">
+        <section className="bg-slate-700 bg-opacity-60 backdrop-blur-md p-0 rounded-lg shadow border border-gray-700 overflow-hidden mt-8">
           <h3 className="text-lg font-semibold text-gray-100 p-2 sm:p-3 border-b border-gray-700">Registered Users List</h3>
           {tableError && <p role="alert" aria-live="assertive" className="p-3 text-center text-red-400">{tableError}</p>}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-700">
               <thead className="bg-gray-700">
                 <tr>
-                  <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">ID</th>
-                  <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Full Name</th>
+                  {/* ID column header removed */}
+                  <th scope="col" className="pl-4 px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Full Name</th>
                   <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Image</th>
                   <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">ID Type</th>
                   <th scope="col" className="px-1.5 py-1.5 sm:px-2 sm:py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Contact</th>
@@ -285,11 +307,11 @@ const VMSUserRegistrationPage: React.FC = () => {
               </thead>
               <tbody className="bg-gray-800 divide-y divide-gray-700">
                 {isTableLoading ? (
-                  <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-gray-400">Loading user data...</td></tr>
+                  <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-gray-400">Loading user data...</td></tr>
                 ) : registeredUsers.length > 0 ? registeredUsers.map((user: RegisteredUser) => (
                   <tr key={user.id} className="hover:bg-gray-700/50 transition-colors">
-                    <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs text-gray-300">{user.id}</td>
-                    <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs font-medium text-gray-100">{user.fullName}</td>
+                    {/* ID data cell removed */}
+                    <td className="pl-4 px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap text-xs font-medium text-gray-100">{user.fullName}</td>
                     <td className="px-1.5 py-1.5 sm:px-2 sm:py-2 whitespace-nowrap">
                       <img src={user.imageFile} alt={user.fullName} className="h-8 w-8 sm:h-10 sm:w-10 object-cover rounded-md" onError={handleImageError}/>
                     </td>
@@ -302,7 +324,7 @@ const VMSUserRegistrationPage: React.FC = () => {
                     </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-gray-400">No users found {searchTerm && 'for the current search'}.</td></tr>
+                  <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-gray-400">No users found {searchTerm && 'for the current search'}.</td></tr>
                 )}
               </tbody>
             </table>

@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react'; 
 import Input from '../common/Input';
 import Textarea from '../common/Textarea';
 import Button from '../common/Button';
 import { apiService } from '../../services/apiService';
+import { LocationContext } from '../LocationContext'; 
 
 interface FormData {
   idNumberType: string;
@@ -48,6 +49,8 @@ const VMSAddRecordPage: React.FC = () => {
   const [userLookupError, setUserLookupError] = useState<string | null>(null);
   const [isUserPreRegistered, setIsUserPreRegistered] = useState<boolean | null>(null);
 
+  const { selectedLocation } = useContext(LocationContext); // Get selectedLocation
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -80,8 +83,9 @@ const VMSAddRecordPage: React.FC = () => {
     setUserLookupError(null);
     setIsUserPreRegistered(null); 
     try {
+      // Image search endpoint should not be location-scoped by default as images are global
       const data = await apiService.get<PreRegisteredUser[] | ApiResponse<PreRegisteredUser>>(`/images/?search=${encodeURIComponent(name)}`);
-      const users: PreRegisteredUser[] = Array.isArray(data) ? data : (data.results || []);
+      const users: PreRegisteredUser[] = Array.isArray(data) ? data : (data?.results || []);
       
       if (users.length > 0) {
         const foundUser = users[0];
@@ -133,15 +137,26 @@ const VMSAddRecordPage: React.FC = () => {
     setError(null);
     setSuccessMessage(null);
 
+    if (!selectedLocation || !selectedLocation.id) {
+        setError("No location selected. Please select a location from the dashboard or location selection page.");
+        setIsLoading(false);
+        return;
+    }
+
     if (!formData.fullName) {
         setError("Full Name is required to add a record.");
         setIsLoading(false);
         return;
     }
     
-    const payload = { ...formData };
+    const payload = { 
+        ...formData,
+        location_id: selectedLocation.id // Include location_id in the payload
+    };
 
     try {
+      // apiService will NOT automatically add location_id to POST body, so we added it to payload.
+      // It WILL add location_id as query param to /visitors/ endpoint, but backend serializer looks in body.
       await apiService.post('/visitors/', payload);
       setSuccessMessage('New visitor record submitted successfully!');
       setFormData(initialFormData); 
@@ -149,7 +164,15 @@ const VMSAddRecordPage: React.FC = () => {
       setUserLookupError(null);
     } catch (err: any) {
       console.error('Add Visitor Error:', err);
-      setError(err.message || err.detail || 'Failed to submit new visitor record.');
+      if (err.status === 400 && err.data) {
+        // Try to parse and display backend validation errors
+        const backendErrors = Object.entries(err.data)
+          .map(([key, value]) => `${key}: ${(Array.isArray(value) ? value.join(', ') : String(value))}`)
+          .join('; ');
+        setError(backendErrors || 'Failed to submit new visitor record. Please check your input.');
+      } else {
+        setError(err.message || err.detail || 'Failed to submit new visitor record.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -196,6 +219,7 @@ const VMSAddRecordPage: React.FC = () => {
               value={formData.idNumberType}
               onChange={handleChange}
               className={inputStyles}
+              placeholder="e.g., Citizenship No., Employee ID, Visitor Pass"
             />
           </div>
           
@@ -229,6 +253,7 @@ const VMSAddRecordPage: React.FC = () => {
               value={formData.reason}
               onChange={handleChange}
               className={inputStyles + " min-h-[100px]"}
+              placeholder="Enter reason for visit"
             />
           </div>
           <div>
@@ -265,7 +290,7 @@ const VMSAddRecordPage: React.FC = () => {
             />
           </div>
           <div className="pt-3">
-            <Button type="submit" fullWidth className="bg-red-600 hover:bg-red-700 text-white" disabled={isLoading}>
+            <Button type="submit" fullWidth className="bg-red-600 hover:bg-red-700 text-white" disabled={isLoading || !selectedLocation}>
               {isLoading ? 'Checking In...' : 'Check In'}
             </Button>
           </div>

@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Button from '../common/Button';
 import { apiService } from '../../services/apiService';
+import { LocationContext } from '../LocationContext'; 
 
 interface VMSDashboardLayoutProps {
   onLogout: () => void;
@@ -39,6 +39,7 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const { selectedLocation } = useContext(LocationContext); 
 
   const [statsData, setStatsData] = useState<StatsData>({
     totalToday: 'N/A',
@@ -53,31 +54,31 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
     { name: 'Add Record', path: '/vms/add-record' },
     { name: 'Visitor List', path: '/vms/visitor-list' },
     { name: 'Reports', path: '/vms/reports' },
-    { name: 'Register User', path: '/vms/add-image' },
+    { name: 'Register User', path: '/vms/add-image' }, 
     { name: 'Add Document', path: '/vms/add-document' },
   ];
 
   const showStatsBar = location.pathname === '/vms/home' || location.pathname === '/vms';
 
   const fetchDashboardStats = useCallback(async () => {
-    if (!showStatsBar) return;
+    if (!showStatsBar || !selectedLocation?.id) return; 
 
     setIsLoadingStats(true);
     setStatsError(null);
     try {
-      // Corrected date parameter generation for full day coverage
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date();
       todayEnd.setHours(23, 59, 59, 999);
 
+      // apiService will automatically append location_id if selectedLocation.id exists
       const queryParams = new URLSearchParams({
         check_in_time_after: todayStart.toISOString(),
         check_in_time_before: todayEnd.toISOString(),
       });
 
       const data = await apiService.get<VisitorStat[] | ApiResponse<VisitorStat>>(`/visitors/?${queryParams.toString()}`);
-      const todaysVisitors: VisitorStat[] = Array.isArray(data) ? data : (data.results || []);
+      const todaysVisitors: VisitorStat[] = Array.isArray(data) ? data : (data?.results || []);
 
       let unexitedCount = 0;
       let exitedCount = 0;
@@ -98,12 +99,12 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
 
     } catch (err: any) {
       console.error('Fetch Dashboard Stats Error:', err);
-      setStatsError(err.message || 'Failed to load dashboard stats.');
+      setStatsError(err.data?.detail || err.message || 'Failed to load dashboard stats.');
       setStatsData({ totalToday: 'Error', unexited: 'Error', exited: 'Error' });
     } finally {
       setIsLoadingStats(false);
     }
-  }, [showStatsBar]);
+  }, [showStatsBar, selectedLocation]); 
 
   useEffect(() => {
     fetchDashboardStats();
@@ -111,8 +112,7 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
 
 
   const handleLogoutClick = () => {
-    onLogout();
-    navigate('/login', {replace: true});
+    onLogout(); 
   }
 
   const handleBackToDashboardClick = () => {
@@ -120,17 +120,24 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
   };
 
   const statsToDisplay: StatDisplayItem[] = [
-    { title: 'TOTAL VISITORS TODAY', value: isLoadingStats ? '...' : statsError ? 'X' : statsData.totalToday },
-    { title: 'UNEXITED VISITORS', value: isLoadingStats ? '...' : statsError ? 'X' : statsData.unexited },
-    { title: 'EXITED VISITORS', value: isLoadingStats ? '...' : statsError ? 'X' : statsData.exited },
+    { title: `TOTAL VISITORS TODAY (${selectedLocation?.name || 'N/A'})`, value: isLoadingStats ? '...' : statsError ? 'X' : statsData.totalToday },
+    { title: `UNEXITED VISITORS (${selectedLocation?.name || 'N/A'})`, value: isLoadingStats ? '...' : statsError ? 'X' : statsData.unexited },
+    { title: `EXITED VISITORS (${selectedLocation?.name || 'N/A'})`, value: isLoadingStats ? '...' : statsError ? 'X' : statsData.exited },
   ];
 
   const getCurrentPageTitle = () => {
-    if (location.pathname === '/vms/home' || location.pathname === '/vms') {
-      return "Welcome to TimesGlobal Visitor Management System !!!";
+    const baseTitle = "Visitor Management";
+    const currentNavItem = sidebarNavItems.find(item => location.pathname.startsWith(item.path));
+    const pageName = currentNavItem ? currentNavItem.name : (location.pathname === '/vms/home' || location.pathname === '/vms' ? "Home" : "");
+    
+    let title = baseTitle;
+    if (pageName && pageName !== "Home") {
+        title = `${pageName} - ${baseTitle}`;
+    } else if (pageName === "Home") {
+        title = `${baseTitle} - Home`;
     }
-    const currentNavItem = sidebarNavItems.find(item => location.pathname.startsWith(item.path)); // Use startsWith for potential sub-routes not in nav
-    return currentNavItem ? currentNavItem.name : "Visitor Management System"; // Default title
+    
+    return `${title} (${selectedLocation?.name || 'No Location'})`;
   };
 
   return (
@@ -171,7 +178,6 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
             ))}
           </nav>
           
-          {/* Logo Section */}
           <div className="p-4 flex justify-center items-center">
             <img
               src="/images/Times Global.png"
@@ -208,7 +214,7 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
         )}
 
         <div className="flex-1 flex flex-col md:ml-60">
-          <header className="bg-red-700 bg-opacity-80 backdrop-blur-md shadow-md text-white p-4 sticky top-0 z-10">
+          <header className="bg-red-700 bg-opacity-80 backdrop-blur-md shadow-md text-white p-4 sticky top-0 z-20">
             <div className="container mx-auto flex items-center justify-between">
               <button 
                 className="md:hidden text-white p-2 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
@@ -227,7 +233,7 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
                   </svg>
                 )}
               </button>
-              <h2 className="text-lg font-semibold text-center flex-grow md:text-center">{getCurrentPageTitle()}</h2>
+              <h2 className="text-sm sm:text-lg font-semibold text-center flex-grow md:text-center">{getCurrentPageTitle()}</h2>
               <div className="w-6 md:hidden"></div> 
             </div>
           </header>
@@ -248,7 +254,7 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
             <Outlet />
           </main>
           
-          <footer className="bg-slate-800 bg-opacity-70 backdrop-blur-md p-3 text-center text-gray-300 text-xs">
+          <footer className="bg-slate-800 bg-opacity-70 backdrop-blur-md p-3 text-center text-gray-300 text-xs mt-auto">
             © {new Date().getFullYear()} Times Global Visitor Management. All rights reserved.
           </footer>
         </div>

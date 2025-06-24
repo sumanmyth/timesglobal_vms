@@ -1,32 +1,32 @@
+# <<<< START OF FILE visitors/serializers.py >>>>
 from rest_framework import serializers
 from .models import Visitor
-# from images.serializers import StoredImageSerializer # If linking to StoredImage
+from locations.models import Location
+from locations.serializers import LocationSerializer
 
 class VisitorSerializer(serializers.ModelSerializer):
-    # If you have a ForeignKey to StoredImage in Visitor model:
-    # visitorImage = StoredImageSerializer(read_only=True) # For displaying image details
-    # visitorImage_id = serializers.PrimaryKeyRelatedField(
-    #     queryset=StoredImage.objects.all(), source='visitorImage', write_only=True, allow_null=True, required=False
-    # )
+    location = LocationSerializer(read_only=True)
+    location_id = serializers.PrimaryKeyRelatedField(
+        queryset=Location.objects.all(), source='location', write_only=True
+    )
 
     class Meta:
         model = Visitor
         fields = [
-            'id', 'idNumberType', 'fullName', 'contact', 'email', 
+            'id', 'location', 'location_id', 'idNumberType', 'fullName', 'contact', 'email', 
             'reason', 'approvedBy', 'requestedBy', 'requestSource',
             'checkInTime', 'checkOutTime', 
-            # 'visitor_image_file', # If direct image upload on Visitor model
-            # 'visitorImage', 'visitorImage_id' # If ForeignKey to StoredImage
+            'created_by_name', 'created_by_email', # Added fields
             'created_at', 'updated_at'
         ]
-        read_only_fields = ('id', 'created_at', 'updated_at', 'checkInTime') # checkInTime is set by default
+        read_only_fields = ('id', 'created_at', 'updated_at', 'checkInTime', 'created_by_name', 'created_by_email') # Added fields
 
-    def create(self, validated_data):
-        # checkInTime is default=timezone.now, so it's handled by the model
-        return super().create(validated_data)
+    # No need to override create if BaseLocationScopedViewSet.perform_create handles created_by_*
 
 class VisitorCheckoutSerializer(serializers.ModelSerializer):
     class Meta:
         model = Visitor
-        fields = ['checkOutTime'] # Only allow updating checkOutTime
-        read_only_fields = [] # Ensure checkOutTime can be written
+        fields = ['checkOutTime']
+        read_only_fields = []
+
+# <<<< END OF FILE visitors/serializers.py >>>>

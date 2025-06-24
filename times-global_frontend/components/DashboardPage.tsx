@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect } from 'react'; 
+import React, { useContext } from 'react'; 
 import { useNavigate } from 'react-router-dom'; 
 import DashboardCard from './common/DashboardCard';
 import Button from './common/Button'; 
+import { LocationContext } from './LocationContext'; 
 
 interface DashboardPageProps {
   onLogout: () => void;
@@ -44,7 +44,7 @@ const TaskManagementIcon: React.FC = () => (
 
 interface DashboardItem {
   title: string;
-  icon: JSX.Element;
+  icon: React.ReactNode; // Changed from JSX.Element to React.ReactNode
   id: string;
 }
 
@@ -58,16 +58,19 @@ const dashboardItems: DashboardItem[] = [
 
 const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
   const navigate = useNavigate(); 
-  const [usernameDisplay, setUsernameDisplay] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storedUsername = localStorage.getItem('username');
-    if (storedUsername) {
-      setUsernameDisplay(storedUsername);
-    }
-  }, []);
+  const { username, selectedLocation, authorizedLocations, switchToLocation } = useContext(LocationContext);
 
   const handleCardClick = (id: string, title: string) => {
+    if (!selectedLocation) {
+        alert("No location selected. Please select a location first.");
+        if (authorizedLocations && authorizedLocations.length > 0) { 
+          navigate('/select-location');
+        } else {
+          navigate('/no-locations-assigned');
+        }
+        return;
+    }
+
     if (id === 'vms') {
       navigate('/vms/home');
     } else if (id === 'device-storage') {
@@ -78,13 +81,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
       navigate('/task-management/home');
     }
      else {
-      alert(`Navigating to ${title} (ID: ${id}) - Feature not implemented yet.`);
+      alert(`Navigating to ${title} (ID: ${id}) for ${selectedLocation.name} - Feature not implemented yet.`);
     }
   };
 
   return (
     <div 
-      className="relative text-gray-100" // Main background container
+      className="relative text-gray-100" 
       style={{ 
         backgroundImage: "url('/images/bgdatacenter.jpeg')", 
         backgroundSize: 'cover', 
@@ -93,24 +96,41 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
         backgroundAttachment: 'fixed' 
       }}
     >
-      {/* Page-level blur overlay */}
       <div className="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-md z-0"></div>
 
-      {/* Content wrapper on top of the blur */}
       <div className="relative z-10 min-h-screen flex flex-col">
         <header className="bg-slate-800 bg-opacity-70 backdrop-blur-sm shadow-lg p-4">
-          <div className="container mx-auto flex justify-between items-center">
+          <div className="container mx-auto flex flex-wrap justify-between items-center gap-2">
             <div>
               <h1 className="text-2xl font-bold text-red-600">Times Global</h1>
               <p className="text-gray-300 text-sm">Management Software</p> 
             </div>
-            <div className="flex items-center space-x-4">
-              {usernameDisplay && (
-                <span className="text-gray-200 text-sm"> 
-                  Welcome, {usernameDisplay}
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              {username ? ( 
+                <span className="text-gray-200 text-xs sm:text-sm"> 
+                  Welcome, {username}
+                </span>
+              ) : (
+                 <span className="text-gray-200 text-xs sm:text-sm"> 
+                  Welcome!
                 </span>
               )}
-              <Button onClick={onLogout} variant="secondary" className="bg-opacity-80"> 
+              {selectedLocation && (
+                <span className="text-gray-200 text-xs sm:text-sm bg-red-700 px-2 py-1 rounded"> 
+                  Location: {selectedLocation.name}
+                </span>
+              )}
+              {authorizedLocations && authorizedLocations.length > 1 && (
+                <select 
+                  value={selectedLocation?.name || ''} 
+                  onChange={(e) => switchToLocation(e.target.value)}
+                  className="bg-gray-700 text-white text-xs p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+                  aria-label="Switch location"
+                >
+                  {authorizedLocations.map(loc => <option key={loc.id} value={loc.name}>{loc.name}</option>)}
+                </select>
+              )}
+              <Button onClick={onLogout} variant="secondary" className="bg-opacity-80 !text-xs !px-3 !py-1.5 sm:!text-sm sm:!px-4 sm:!py-2"> 
                 Logout
               </Button>
             </div>
@@ -118,7 +138,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
         </header>
 
         <main className="flex-grow container mx-auto p-6 md:p-8">
-          <h2 className="text-3xl font-semibold text-gray-100 mb-8 text-center md:text-left">Dashboard Modules</h2>
+          <h2 className="text-3xl font-semibold text-gray-100 mb-8 text-center md:text-left">Dashboard Modules {selectedLocation && `for ${selectedLocation.name}`}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {dashboardItems.map((item: DashboardItem) => (
               <DashboardCard
@@ -129,12 +149,11 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onLogout }) => {
               />
             ))}
           </div>
-          {/* Times Global Logo added here */}
           <div className="mt-16 mb-8 flex justify-center"> 
             <img 
               src="/images/Times Global.png" 
               alt="Times Global Logo" 
-              className="h-40 w-auto" // Adjusted height for visibility
+              className="h-40 w-auto" 
             />
           </div>
         </main>

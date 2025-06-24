@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../../services/apiService';
 
@@ -22,11 +21,20 @@ const TaskManagementHomePage: React.FC = () => {
     setCountError(null);
     try {
       const response = await apiService.get<CompletedCountResponse>('/task-management/tasks/completed-today-count/');
-      setCompletedTodayCount(response.count);
+      if (response !== undefined) {
+        setCompletedTodayCount(response.count);
+      } else {
+        // Handle undefined response: API call was successful but no data (e.g., 204 No Content)
+        // For a count, this might imply 0 or an unexpected empty response.
+        console.warn("Completed today count API returned undefined, defaulting to 0.");
+        setCompletedTodayCount(0);
+        // Optionally, set a specific error if this state is truly unexpected
+        // setCountError("Count data not available (empty response)."); 
+      }
     } catch (err: any) {
       console.error('Fetch Completed Today Count Error:', err);
       setCountError('Failed to load count');
-      setCompletedTodayCount('Error');
+      setCompletedTodayCount('Error'); // UI will show 'X'
     } finally {
       setIsLoadingCount(false);
     }

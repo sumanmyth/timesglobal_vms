@@ -15,7 +15,8 @@ declare module 'react/jsx-runtime'; // If using automatic JSX runtime
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import AppWrapper from './App'; // Changed to AppWrapper
+import { LocationProvider } from './components/LocationContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -25,6 +26,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <LocationProvider>
+      <AppWrapper /> 
+    </LocationProvider>
   </React.StrictMode>
 );

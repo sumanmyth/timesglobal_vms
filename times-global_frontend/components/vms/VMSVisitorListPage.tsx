@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react'; // Added useContext
 import Input from '../common/Input';
 import Button from '../common/Button';
 import { apiService } from '../../services/apiService';
+import { LocationContext } from '../LocationContext'; // Import LocationContext
 
 interface Visitor {
   id: string; 
@@ -49,6 +49,8 @@ const VMSVisitorListPage: React.FC = () => {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  
+  const { selectedLocation } = useContext(LocationContext); // Get selectedLocation
 
 
   const handleDateFromChange = (e: React.ChangeEvent<HTMLInputElement>) => setDateFrom(e.target.value);
@@ -64,8 +66,9 @@ const VMSVisitorListPage: React.FC = () => {
       visitorList.map(async (visitor: Visitor) => {
         if (!visitor.visitorImage && visitor.fullName) { 
           try {
+            // Image search should not be location-scoped, assuming images are global
             const imageData = await apiService.get<StoredImage[] | ApiResponse<StoredImage>>(`/images/?search=${encodeURIComponent(visitor.fullName)}`);
-            const images: StoredImage[] = Array.isArray(imageData) ? imageData : (imageData.results || []);
+            const images: StoredImage[] = Array.isArray(imageData) ? imageData : (imageData?.results || []);
             if (images.length > 0 && images[0].imageFile) {
               return { ...visitor, visitorImage: images[0].imageFile };
             }
@@ -79,6 +82,12 @@ const VMSVisitorListPage: React.FC = () => {
   };
 
   const fetchTodaysVisitors = useCallback(async () => {
+    if (!selectedLocation?.id) { // Ensure location is selected
+      setTodaysVisitors([]);
+      setIsLoadingTodaysVisitors(false);
+      setTodaysVisitorsError("No location selected to fetch today's visitors.");
+      return;
+    }
     setIsLoadingTodaysVisitors(true);
     setTodaysVisitorsError(null);
     try {
@@ -86,51 +95,76 @@ const VMSVisitorListPage: React.FC = () => {
       const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
       const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
 
+      // apiService will append location_id based on selectedLocation in context
       let queryParams = new URLSearchParams();
       queryParams.append('check_in_time_after', todayStart);
       queryParams.append('check_in_time_before', todayEnd);
       
       const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
-      let fetchedTodaysVisitors: Visitor[] = Array.isArray(data) ? data : (data.results || []);
+      let fetchedTodaysVisitors: Visitor[] = Array.isArray(data) ? data : (data?.results || []);
       
       const visitorsWithImages = await enrichVisitorsWithImages(fetchedTodaysVisitors);
       setTodaysVisitors(visitorsWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));
     } catch (err: any) {
       console.error('Fetch Today\'s Visitors Error:', err);
-      setTodaysVisitorsError(err.message || 'Failed to fetch today\'s visitor list.');
+      setTodaysVisitorsError(err.data?.detail || err.message || "Failed to fetch today's visitor list.");
       setTodaysVisitors([]);
     } finally {
       setIsLoadingTodaysVisitors(false);
     }
-  }, []);
+  }, [selectedLocation]); // Depend on selectedLocation
 
   const fetchVisitors = useCallback(async () => {
+    if (!selectedLocation?.id && (dateFrom || dateTo || searchName)) { // Require location if filtering
+        setError("A location must be selected to filter visitors.");
+        setVisitors([]);
+        setIsLoading(false);
+        return;
+    }
+    if (!selectedLocation?.id && !dateFrom && !dateTo && !searchName) { // No location and no filters, show nothing or specific message
+        setVisitors([]); // Clear previous results
+        setIsLoading(false);
+        // setError("Please select a location or apply filters."); // Optional: prompt user
+        return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
+      // apiService will append location_id if selectedLocation.id exists
       let queryParams = new URLSearchParams();
       if (dateFrom) queryParams.append('check_in_time_after', dateFrom + "T00:00:00Z"); 
       if (dateTo) queryParams.append('check_in_time_before', dateTo + "T23:59:59Z");   
       if (searchName) queryParams.append('search', searchName); 
 
       const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
-      let fetchedVisitors: Visitor[] = Array.isArray(data) ? data : (data.results || []);
+      let fetchedVisitors: Visitor[] = Array.isArray(data) ? data : (data?.results || []);
       
       const visitorsWithImages = await enrichVisitorsWithImages(fetchedVisitors);
       setVisitors(visitorsWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));
     } catch (err: any) { 
       console.error('Fetch Visitors Error:', err);
-      setError(err.message || 'Failed to fetch visitor list.');
+      setError(err.data?.detail || err.message || 'Failed to fetch visitor list.');
       setVisitors([]);
     } finally {
       setIsLoading(false);
     }
-  }, [dateFrom, dateTo, searchName]);
+  }, [dateFrom, dateTo, searchName, selectedLocation]); // Depend on selectedLocation
 
   useEffect(() => {
-    fetchTodaysVisitors();
-    fetchVisitors(); 
-  }, [fetchTodaysVisitors, fetchVisitors]);
+    // ProtectedRoute should ensure selectedLocation exists if this page is rendered.
+    if (selectedLocation) {
+        fetchTodaysVisitors();
+        fetchVisitors(); 
+    } else {
+        // Handle case where page might be rendered without selectedLocation (should ideally be prevented by router)
+        setIsLoadingTodaysVisitors(false);
+        setIsLoading(false);
+        setTodaysVisitors([]);
+        setVisitors([]);
+        // Optional: set a message if needed, but router should prevent this state.
+    }
+  }, [fetchTodaysVisitors, fetchVisitors, selectedLocation]);
 
   const handleFilterByDate = () => fetchVisitors();
   const handleSearchByName = () => fetchVisitors();
@@ -138,20 +172,27 @@ const VMSVisitorListPage: React.FC = () => {
   const handleCheckOut = async (visitorId: string) => {
     if (!window.confirm('Are you sure you want to check out this visitor?')) return;
     try {
+      // apiService will append location_id
       const updatedVisitor = await apiService.patch<Visitor>(`/visitors/${visitorId}/checkout/`, {}); 
       
       setVisitors((prevVisitors: Visitor[]) => 
-        prevVisitors.map((v: Visitor) => v.id === visitorId ? { ...v, checkOutTime: updatedVisitor.checkOutTime } : v)
+        prevVisitors.map((v: Visitor) => v.id === visitorId ? { ...v, checkOutTime: updatedVisitor?.checkOutTime } : v)
       );
       setTodaysVisitors((prevTodays: Visitor[]) =>
         prevTodays.map(tv =>
-          tv.id === visitorId ? { ...tv, checkOutTime: updatedVisitor.checkOutTime } : tv
+          tv.id === visitorId ? { ...tv, checkOutTime: updatedVisitor?.checkOutTime } : tv
         )
       );
-      alert('Visitor checked out successfully.');
+      if (updatedVisitor) {
+        alert('Visitor checked out successfully.');
+      } else {
+        alert('Visitor checkout processed. (No confirmation data returned)');
+        fetchTodaysVisitors(); 
+        fetchVisitors();
+      }
     } catch (err: any) {
       console.error('Check-out error:', err);
-      alert(`Failed to check out visitor: ${err.message || err.detail}`);
+      alert(`Failed to check out visitor: ${err.data?.detail || err.message}`);
     }
   };
 
@@ -162,15 +203,16 @@ const VMSVisitorListPage: React.FC = () => {
     setHistoryError(null);
     setVisitorHistory([]);
     try {
+      // apiService will append location_id for the /visitors/ endpoint
       const queryParams = new URLSearchParams({ search: visitor.fullName });
       const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
-      let historyEntries: Visitor[] = Array.isArray(data) ? data : (data.results || []);
+      let historyEntries: Visitor[] = Array.isArray(data) ? data : (data?.results || []);
 
       const historyWithImages = await enrichVisitorsWithImages(historyEntries);
       setVisitorHistory(historyWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));
     } catch (err: any) {
       console.error('Fetch Visitor History Error:', err);
-      setHistoryError(err.message || 'Failed to fetch visitor history.');
+      setHistoryError(err.data?.detail || err.message || 'Failed to fetch visitor history.');
     } finally {
       setIsLoadingHistory(false);
     }
@@ -195,18 +237,26 @@ const VMSVisitorListPage: React.FC = () => {
       if (includeTime) {
         options.hour = '2-digit';
         options.minute = '2-digit';
-        options.second = '2-digit';
+        // options.second = '2-digit'; // Seconds can make it too busy
         options.hour12 = true;
       }
-      return new Date(isoString).toLocaleString(undefined, options);
+      return new Date(isoString).toLocaleString('en-US', options);
     } catch {
       return isoString; 
     }
   };
 
   const renderVisitorTable = (visitorList: Visitor[], listType: 'today' | 'historical') => {
+    // If ProtectedRoute is working, we assume the user is approved and has a location.
+    // Error messages are for API failures.
     if (!visitorList || visitorList.length === 0) {
-      return <p className="px-3 py-10 text-center text-sm text-gray-400">No visitors found{listType === 'historical' && (searchName || dateFrom || dateTo) ? ' for the current filters' : ''}.</p>;
+      if (listType === 'today' && !isLoadingTodaysVisitors && !todaysVisitorsError) {
+          return <p className="px-3 py-10 text-center text-sm text-gray-400">No visitors checked in today for {selectedLocation?.name || 'the selected location'}.</p>;
+      }
+      if (listType === 'historical' && !isLoading && !error) {
+        return <p className="px-3 py-10 text-center text-sm text-gray-400">No visitors found{ (searchName || dateFrom || dateTo) ? ' for the current filters' : `for ${selectedLocation?.name || 'the selected location'}`}.</p>;
+      }
+      return null; // Let loading/error messages handle other states
     }
     return (
       <table className="min-w-full divide-y divide-gray-700">
@@ -256,7 +306,6 @@ const VMSVisitorListPage: React.FC = () => {
       </div>
       
       <div className="flex-grow p-2 md:p-3 overflow-y-auto">
-        {/* Today's Visitors Section */}
         <div className="mb-3 bg-slate-700 bg-opacity-60 backdrop-blur-md rounded-lg shadow border border-gray-700">
           <h3 className="text-lg font-semibold text-gray-100 p-2 sm:p-3 border-b border-gray-700">Today's Visitors</h3>
           {isLoadingTodaysVisitors && <p className="p-3 text-center text-gray-300">Loading today's visitors...</p>}
@@ -270,7 +319,6 @@ const VMSVisitorListPage: React.FC = () => {
 
         <hr className="border-gray-600 my-2 sm:my-3" />
 
-        {/* Historical / Filtered Visitor List Section */}
         <div className="mb-3 p-2 sm:p-3 bg-slate-700 bg-opacity-60 backdrop-blur-md rounded-lg shadow border border-gray-700">
           <h3 className="text-lg font-semibold text-gray-100 mb-2 sm:mb-3">Search Visitor Log</h3>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3 items-end">
@@ -306,8 +354,6 @@ const VMSVisitorListPage: React.FC = () => {
         </div>
       </div>
 
-
-      {/* Visitor History Modal */}
       {isHistoryModalOpen && selectedVisitorForHistory && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-2 z-50"

@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 
 interface GatePassItemData {
@@ -101,7 +99,7 @@ const PrintableGatePass: React.FC<PrintableGatePassProps> = ({ gatePassData }) =
             <img
               src="/images/Times Global.png"
               alt="Times Global Logo"
-              className="h-8 print-logo" // Changed logo height to h-8 (32px)
+              className="h-8 print-logo" 
             />
           </div>
 

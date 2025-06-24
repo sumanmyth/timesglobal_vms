@@ -1,10 +1,10 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import Input from '../common/Input';
 import Button from '../common/Button';
 import { apiService } from '../../services/apiService';
 import PrintableGatePass from './PrintableGatePass'; 
+import { LocationContext } from '../LocationContext'; 
 
 interface GatePassFormProps {
   onLogout: () => void;
@@ -36,6 +36,9 @@ interface GatePassResponseData {
   received_by: string;
   approved_by: string;
   pass_date: string; 
+  location_id?: string | number; 
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface ApiResponse<T> {
@@ -46,16 +49,25 @@ interface ApiResponse<T> {
 
 const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
   const navigate = useNavigate();
-  const [recipientName, setRecipientName] = useState<string>('');
-  const [recipientAddress, setRecipientAddress] = useState<string>('');
-  
-  const [items, setItems] = useState<GatePassItem[]>([
-    { id: Date.now().toString(), sno: '', itemName: '', description: '', quantity: '', remarks: '' } 
-  ]);
+  const { selectedLocation, username } = useContext(LocationContext); 
 
-  const [preparedBy, setPreparedBy] = useState<string>('');
-  const [receivedBy, setReceivedBy] = useState<string>('');
-  const [approvedBy, setApprovedBy] = useState<string>('');
+  const initialRecipientName = '';
+  const initialRecipientAddress = '';
+  const initialPassDate = new Date().toISOString().split('T')[0];
+  const initialItems = (): GatePassItem[] => [{ id: Date.now().toString(), sno: '', itemName: '', description: '', quantity: '', remarks: '' }];
+  const getInitialPreparedBy = () => username || '';
+  const initialReceivedBy = '';
+  const initialApprovedBy = '';
+
+  const [recipientName, setRecipientName] = useState<string>(initialRecipientName);
+  const [recipientAddress, setRecipientAddress] = useState<string>(initialRecipientAddress);
+  const [passDate, setPassDate] = useState<string>(initialPassDate); 
+
+  const [items, setItems] = useState<GatePassItem[]>(initialItems());
+
+  const [preparedBy, setPreparedBy] = useState<string>(getInitialPreparedBy()); 
+  const [receivedBy, setReceivedBy] = useState<string>(initialReceivedBy);
+  const [approvedBy, setApprovedBy] = useState<string>(initialApprovedBy);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,16 +76,29 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
   const [submittedGatePassData, setSubmittedGatePassData] = useState<GatePassResponseData | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState<boolean>(false);
 
-  // State for "View Previous Passes" modal
   const [showPreviousPassesModal, setShowPreviousPassesModal] = useState<boolean>(false);
   const [previousPasses, setPreviousPasses] = useState<GatePassResponseData[]>([]);
   const [isLoadingPreviousPasses, setIsLoadingPreviousPasses] = useState<boolean>(false);
   const [previousPassesError, setPreviousPassesError] = useState<string | null>(null);
-  const [reprintLoadingId, setReprintLoadingId] = useState<string | null>(null);
+  
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null); // For View/Reprint loading
+  const [actionTypeForLoading, setActionTypeForLoading] = useState<'View' | 'Reprint' | null>(null);
+  
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [isSavingChanges, setIsSavingChanges] = useState<boolean>(false);
+
+
+  useEffect(() => {
+    setPreparedBy(getInitialPreparedBy());
+    if (!editingRecordId) { // Only reset if not in edit mode
+        resetForm();
+    }
+  }, [username, selectedLocation]); // Removed editingRecordId to avoid re-resetting while editing
 
 
   const handleRecipientNameChange = (e: React.ChangeEvent<HTMLInputElement>) => setRecipientName(e.target.value);
   const handleRecipientAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => setRecipientAddress(e.target.value);
+  const handlePassDateChange = (e: React.ChangeEvent<HTMLInputElement>) => setPassDate(e.target.value); 
   const handlePreparedByChange = (e: React.ChangeEvent<HTMLInputElement>) => setPreparedBy(e.target.value);
   const handleReceivedByChange = (e: React.ChangeEvent<HTMLInputElement>) => setReceivedBy(e.target.value);
   const handleApprovedByChange = (e: React.ChangeEvent<HTMLInputElement>) => setApprovedBy(e.target.value);
@@ -104,30 +129,72 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
   };
 
   const resetForm = () => {
-    setRecipientName('');
-    setRecipientAddress('');
-    setItems([{ id: Date.now().toString(), sno: '', itemName: '', description: '', quantity: '', remarks: '' }]);
-    setPreparedBy('');
-    setReceivedBy('');
-    setApprovedBy('');
+    setRecipientName(initialRecipientName);
+    setRecipientAddress(initialRecipientAddress);
+    setPassDate(initialPassDate); 
+    setItems(initialItems());
+    setPreparedBy(getInitialPreparedBy()); 
+    setReceivedBy(initialReceivedBy);
+    setApprovedBy(initialApprovedBy);
     setError(null);
     setSuccessMessage(null);
+    setEditingRecordId(null);
+    setIsSavingChanges(false);
+  };
+  
+  const populateFormFields = (data: GatePassResponseData) => {
+    setRecipientName(data.recipient_name);
+    setRecipientAddress(data.recipient_address);
+    setPassDate(data.pass_date);
+    const repopulatedItems = data.items.map((item, index) => ({
+      ...item,
+      id: Date.now().toString() + index,
+    }));
+    setItems(repopulatedItems);
+    setPreparedBy(data.prepared_by);
+    setReceivedBy(data.received_by);
+    setApprovedBy(data.approved_by);
+    setError(null);
+    setSuccessMessage(null); // Clear previous messages
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+     if (editingRecordId) {
+      setError("Cannot submit new pass while in edit mode. Please save changes or clear form.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
     setSubmittedGatePassData(null);
     setShowPrintPreview(false);
 
-    const itemsPayload: GatePassItemPayload[] = items.map(({ id, ...restOfItem }) => restOfItem);
+    if (!selectedLocation || !selectedLocation.id) {
+        setError("No location selected. Please select a location from the dashboard.");
+        setIsLoading(false);
+        return;
+    }
+    if (!passDate) {
+        setError("Pass Date is required.");
+        setIsLoading(false);
+        return;
+    }
 
+    const itemsPayload: GatePassItemPayload[] = items.map(item => ({
+      sno: item.sno,
+      itemName: item.itemName,
+      description: item.description,
+      quantity: item.quantity,
+      remarks: item.remarks,
+    }));
 
     const formDataToSubmit = {
+      location_id: selectedLocation.id, 
       recipient_name: recipientName,
       recipient_address: recipientAddress,
+      pass_date: passDate, 
       items: itemsPayload,
       prepared_by: preparedBy,
       received_by: receivedBy,
@@ -136,11 +203,15 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
 
     try {
       const response = await apiService.post<GatePassResponseData>('/gate-passes/', formDataToSubmit);
-      setSuccessMessage('Gate Pass form submitted successfully! Preparing print preview...');
-      
-      setSubmittedGatePassData(response); 
-      setShowPrintPreview(true);
-      resetForm(); 
+      if (response) {
+        setSuccessMessage('Gate Pass form submitted successfully! Preparing print preview...');
+        setSubmittedGatePassData(response); 
+        setShowPrintPreview(true);
+      } else {
+        setError('Form submitted, but no data was returned from the server. Please check or try again.');
+        setSubmittedGatePassData(null); 
+        setShowPrintPreview(false);
+      }
     } catch (err: any) {
       console.error('Gate Pass Form Submission Error:', err);
       const errorMessage = err.data?.detail || err.message || 'Failed to submit gate pass form.';
@@ -150,8 +221,8 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
         const fieldErrors = Object.entries(err.data).map(([key, value]) => {
             if (key === 'items' && Array.isArray(value)) {
                 return value.map((itemError: any, index: number) => 
-                    Object.entries(itemError).map(([itemKey, itemValue]) => 
-                        `Item ${index+1} ${itemKey}: ${ (Array.isArray(value) ? value.join(', ') : String(value))}`
+                    Object.entries(itemError).map(([itemKey, itemVal]) => 
+                        `Item ${index+1} ${itemKey}: ${ (Array.isArray(itemVal) ? itemVal.join(', ') : String(itemVal))}`
                     ).join('; ')
                 ).join(' | ');
             }
@@ -166,6 +237,68 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
       setIsLoading(false);
     }
   };
+  
+  const handleSaveChanges = async () => {
+    if (!editingRecordId) {
+        setError("No record selected for update.");
+        return;
+    }
+    setIsSavingChanges(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    const itemsPayload: GatePassItemPayload[] = items.map(({ id, ...rest }) => rest);
+    const formDataToUpdate = {
+      location_id: selectedLocation?.id,
+      recipient_name: recipientName,
+      recipient_address: recipientAddress,
+      pass_date: passDate,
+      items: itemsPayload,
+      prepared_by: preparedBy,
+      received_by: receivedBy,
+      approved_by: approvedBy,
+    };
+
+    try {
+      const response = await apiService.put<GatePassResponseData>(`/gate-passes/${editingRecordId}/`, formDataToUpdate);
+      if (response) {
+        setSuccessMessage("Gate Pass updated successfully!");
+        populateFormFields(response);
+        setEditingRecordId(response.id);
+      } else {
+        setError("Update successful, but no data returned from server.");
+      }
+    } catch (err: any) {
+      console.error('Update Gate Pass Error:', err);
+      const errorMessage = err.data?.detail || err.message || 'Failed to update gate pass.';
+      setError(errorMessage);
+    } finally {
+      setIsSavingChanges(false);
+    }
+  };
+
+  const handlePrintCurrentForm = () => {
+    const currentFormData: GatePassResponseData = {
+        id: editingRecordId || `preview-${Date.now()}`,
+        recipient_name: recipientName,
+        recipient_address: recipientAddress,
+        pass_date: passDate,
+        items: items.map(({ id, ...rest }) => rest),
+        prepared_by: preparedBy,
+        received_by: receivedBy,
+        approved_by: approvedBy,
+        location_id: selectedLocation?.id,
+    };
+    setSubmittedGatePassData(currentFormData);
+    setShowPrintPreview(true);
+    setSuccessMessage("Displaying print preview for current form data (not saved).");
+    setError(null);
+  };
+
+  const handleClearAndNewEntry = () => {
+    resetForm();
+    setSuccessMessage("Form cleared. Ready for new entry.");
+  };
 
   const handlePrint = () => {
     const printWrapper = document.querySelector('.gate-pass-print-preview-wrapper');
@@ -174,9 +307,7 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
         document.body.classList.add('gate-pass-active-print'); 
         printWrapper.classList.add('print-this-section');
     }
-    
     window.print();
-    
     if(printWrapper) {
         printWrapper.classList.remove('print-this-section');
     }
@@ -188,36 +319,34 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
     setShowPrintPreview(false);
     setSubmittedGatePassData(null);
     setSuccessMessage(null); 
+    setError(null);
   };
-
+  
   const handleEditForm = () => {
     if (submittedGatePassData) {
-      setRecipientName(submittedGatePassData.recipient_name);
-      setRecipientAddress(submittedGatePassData.recipient_address);
-      
-      const repopulatedItems = submittedGatePassData.items.map((item, index) => ({
-        ...item,
-        id: Date.now().toString() + index 
-      }));
-      setItems(repopulatedItems);
-
-      setPreparedBy(submittedGatePassData.prepared_by);
-      setReceivedBy(submittedGatePassData.received_by);
-      setApprovedBy(submittedGatePassData.approved_by);
-
+      populateFormFields(submittedGatePassData);
+      setEditingRecordId(submittedGatePassData.id); 
       setShowPrintPreview(false);
       setSubmittedGatePassData(null);
       setError(null);
-      setSuccessMessage(null);
+      setSuccessMessage("Form loaded for editing.");
     }
   };
+  
+  const handleCreateNewPassFromPreview = () => {
+    handleClosePrintPreview();
+    resetForm();
+    setSuccessMessage("Ready for new gate pass.");
+  };
+
 
   const fetchPreviousPasses = async () => {
+    if (!selectedLocation?.id) return;
     setIsLoadingPreviousPasses(true);
     setPreviousPassesError(null);
     try {
       const response = await apiService.get<ApiResponse<GatePassResponseData>>('/gate-passes/');
-      setPreviousPasses(response.results || []);
+      setPreviousPasses(response?.results || []); 
     } catch (err: any) {
       console.error('Fetch Previous Passes Error:', err);
       setPreviousPassesError(err.message || 'Failed to fetch previous gate passes.');
@@ -229,26 +358,51 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
 
   const handleTogglePreviousPassesModal = () => {
     setShowPreviousPassesModal(prev => !prev);
-    if (!showPreviousPassesModal) { // If opening modal
+    if (!showPreviousPassesModal && selectedLocation?.id) { 
       fetchPreviousPasses();
     }
   };
 
-  const handleReprintPass = async (passId: string) => {
-    setReprintLoadingId(passId);
+  const loadAndShowPass = async (passId: string, actionType: 'View' | 'Reprint') => {
+    setActionTypeForLoading(actionType);
+    setLoadingActionId(passId);
     setError(null);
     setSuccessMessage(null);
     try {
       const passData = await apiService.get<GatePassResponseData>(`/gate-passes/${passId}/`);
-      setSubmittedGatePassData(passData);
-      setShowPrintPreview(true);
-      setShowPreviousPassesModal(false); 
+      if (passData) {
+        if (actionType === 'View') {
+          populateFormFields(passData);
+          setEditingRecordId(passData.id); 
+          setShowPrintPreview(false);
+          setSubmittedGatePassData(null); 
+          setSuccessMessage("Gate Pass loaded for viewing/editing.");
+        } else { 
+          setSubmittedGatePassData(passData);
+          setShowPrintPreview(true);
+          setSuccessMessage("Gate Pass loaded for reprinting.");
+        }
+        setShowPreviousPassesModal(false); 
+      } else {
+        setError(`Failed to load gate pass data for ${actionType.toLowerCase()} (ID: ${passId}). No data returned.`);
+        setSubmittedGatePassData(null); 
+        setShowPrintPreview(false);
+      }
     } catch (err: any) {
-      console.error('Reprint Gate Pass Error:', err);
-      setError(`Failed to load gate pass for reprint: ${err.message || err.detail}`);
+      console.error(`${actionType} Gate Pass Error:`, err);
+      setError(`Failed to load gate pass for ${actionType.toLowerCase()}: ${err.message || err.data?.detail}`);
     } finally {
-      setReprintLoadingId(null);
+      setLoadingActionId(null);
+      setActionTypeForLoading(null);
     }
+  };
+  
+  const handleViewPass = (passId: string) => {
+    loadAndShowPass(passId, 'View');
+  };
+
+  const handleReprintPass = (passId: string) => {
+    loadAndShowPass(passId, 'Reprint');
   };
   
   const formatModalDate = (isoDate: string) => {
@@ -267,7 +421,8 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
       <div className="bg-gray-100 py-10 px-4 gate-pass-print-preview-wrapper"> 
         <div className="max-w-4xl mx-auto bg-white p-6 shadow-xl rounded-lg no-print"> 
           <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">Gate Pass Preview</h2>
-          {successMessage && <p className="mb-4 text-center text-green-600">{successMessage}</p>}
+          {successMessage && <p className="mb-4 text-center text-green-600 no-print">{successMessage}</p>}
+          {error && <p className="mb-4 text-center text-red-600 no-print">{error}</p>}
         </div>
 
         <div className="print-container-for-two-slips flex flex-col items-center gap-5"> 
@@ -282,7 +437,7 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
           <Button onClick={handleEditForm} variant="secondary" className="bg-blue-600 hover:bg-blue-700 text-white">
             Edit Pass
           </Button>
-          <Button onClick={handleClosePrintPreview} variant="secondary">
+          <Button onClick={handleCreateNewPassFromPreview} variant="secondary">
             Create New Gate Pass
           </Button>
         </div>
@@ -323,27 +478,39 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
         <main className="flex-grow container mx-auto p-6 md:p-8 no-print">
           <form onSubmit={handleSubmit} className="bg-slate-700 bg-opacity-60 backdrop-blur-md p-6 md:p-8 rounded-lg shadow-2xl max-w-6xl mx-auto">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-3xl font-semibold text-red-500">Create Gatepass</h2>
+              <h2 className="text-3xl font-semibold text-red-500">
+                {editingRecordId ? `Edit Gate Pass` : 'Create Gate Pass'}
+                ({selectedLocation?.name || 'No Location Selected'})
+              </h2>
               <Button 
                 type="button" 
                 onClick={handleTogglePreviousPassesModal} 
                 variant="secondary" 
                 className="bg-teal-600 hover:bg-teal-700"
+                disabled={!selectedLocation}
               >
                 View Previous Passes
               </Button>
             </div>
             
             {error && <p role="alert" aria-live="assertive" className="mb-4 text-center text-red-300 bg-red-800/50 p-3 rounded whitespace-pre-wrap">{error}</p>}
+            {successMessage && !showPrintPreview && <p role="status" aria-live="polite" className="mb-4 text-center text-green-300 bg-green-800/50 p-3 rounded">{successMessage}</p>}
+            
+            {editingRecordId && <p className="mb-4 text-center text-green-400 bg-green-900/50 p-3 rounded">Form loaded for editing.</p>}
+
 
             <section className="mb-8">
               <h3 className="text-xl font-semibold text-red-500 mb-1 border-b-2 border-red-500 pb-2">Recipient Details</h3>
-              <div className="mt-4 grid grid-cols-1 gap-6">
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label htmlFor="recipientName" className="block text-sm font-medium text-gray-300 mb-1">MR/MRS.:</label>
                   <Input id="recipientName" name="recipientName" type="text" value={recipientName} onChange={handleRecipientNameChange} placeholder="Recipient's Full Name" required/>
                 </div>
                 <div>
+                  <label htmlFor="passDate" className="block text-sm font-medium text-gray-300 mb-1">PASS DATE:</label>
+                  <Input id="passDate" name="passDate" type="date" value={passDate} onChange={handlePassDateChange} required/>
+                </div>
+                <div className="md:col-span-2">
                   <label htmlFor="recipientAddress" className="block text-sm font-medium text-gray-300 mb-1">ADDRESS:</label>
                   <Input id="recipientAddress" name="recipientAddress" type="text" value={recipientAddress} onChange={handleRecipientAddressChange} placeholder="Recipient's Address" />
                 </div>
@@ -361,7 +528,7 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
                   <span>REMARKS</span>
                   <span className="text-center">ACTION</span>
                 </div>
-                {items.map((item: GatePassItem, index: number) => (
+                {items.map((item: GatePassItem) => ( 
                   <div key={item.id} className="grid grid-cols-1 md:grid-cols-[minmax(100px,1fr)_1.5fr_2fr_1fr_1.5fr_auto] gap-3 items-center bg-gray-700/50 p-3 rounded">
                     <Input 
                       aria-label="Serial Number" 
@@ -403,10 +570,44 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
               </div>
             </section>
 
-            <div className="mt-10 text-center">
-              <Button type="submit" className="w-full md:w-auto bg-red-700 hover:bg-red-800 text-white text-lg px-10 py-3" disabled={isLoading}>
-                {isLoading ? 'Submitting...' : 'SAVE & GENERATE PASS'}
-              </Button>
+            <div className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4">
+                {editingRecordId ? (
+                    <>
+                        <Button 
+                            type="button" 
+                            onClick={handleSaveChanges}
+                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-lg px-8 py-3" 
+                            disabled={isSavingChanges || !selectedLocation}
+                        >
+                            {isSavingChanges ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                        <Button 
+                            type="button" 
+                            onClick={handlePrintCurrentForm}
+                            variant="primary"
+                            className="w-full sm:w-auto text-lg px-8 py-3" 
+                            disabled={isSavingChanges || isLoading}
+                        >
+                            Print Current
+                        </Button>
+                        <Button 
+                            type="button" 
+                            onClick={handleClearAndNewEntry}
+                            variant="secondary"
+                            className="w-full sm:w-auto text-lg px-8 py-3" 
+                        >
+                            Clear / New Entry
+                        </Button>
+                    </>
+                ) : (
+                    <Button 
+                        type="submit" 
+                        className="w-full sm:w-auto bg-red-700 hover:bg-red-800 text-white text-lg px-10 py-3" 
+                        disabled={isLoading || !selectedLocation}
+                    >
+                        {isLoading ? 'Submitting...' : 'SAVE & GENERATE PASS'}
+                    </Button>
+                )}
             </div>
           </form>
         </main>
@@ -432,7 +633,7 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
               {!isLoadingPreviousPasses && !previousPassesError && (
                 <div className="overflow-y-auto flex-grow">
                   {previousPasses.length === 0 ? (
-                    <p className="text-center text-gray-400 py-4">No previous gate passes found.</p>
+                    <p className="text-center text-gray-400 py-4">No previous gate passes found for {selectedLocation?.name || 'this location'}.</p>
                   ) : (
                     <ul className="space-y-3">
                       {previousPasses.map((pass) => (
@@ -440,16 +641,27 @@ const GatePassForm: React.FC<GatePassFormProps> = ({ onLogout }) => {
                           <div>
                             <p className="text-sm text-gray-300">Date: <span className="font-semibold text-gray-100">{formatModalDate(pass.pass_date)}</span></p>
                             <p className="text-sm text-gray-300">Recipient: <span className="font-semibold text-gray-100">{pass.recipient_name}</span></p>
+                             {pass.updated_at && <p className="text-xs text-gray-400">Last Updated: {new Date(pass.updated_at).toLocaleString()}</p>}
                           </div>
-                          <Button 
-                            type="button"
-                            onClick={() => handleReprintPass(pass.id)} 
-                            variant="primary" 
-                            className="!px-3 !py-1.5 text-sm"
-                            disabled={reprintLoadingId === pass.id}
-                          >
-                            {reprintLoadingId === pass.id ? 'Loading...' : 'Reprint'}
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button 
+                                type="button"
+                                onClick={() => handleViewPass(pass.id)} 
+                                className="!px-3 !py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white"
+                                disabled={loadingActionId === pass.id}
+                              >
+                                {loadingActionId === pass.id && actionTypeForLoading === 'View' ? 'Loading...' : 'View'}
+                            </Button>
+                            <Button 
+                              type="button"
+                              onClick={() => handleReprintPass(pass.id)} 
+                              variant="primary" 
+                              className="!px-3 !py-1.5 text-sm" 
+                              disabled={loadingActionId === pass.id}
+                            >
+                              {loadingActionId === pass.id && actionTypeForLoading === 'Reprint' ? 'Loading...' : 'Reprint'}
+                            </Button>
+                          </div>
                         </li>
                       ))}
                     </ul>

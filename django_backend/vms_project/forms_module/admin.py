@@ -1,21 +1,31 @@
+# <<<< START OF FILE forms_module/admin.py >>>>
 from django.contrib import admin
 from .models import DeviceStorageEntry, DeviceStorageItem, GatePass, GatePassItem
 
 class DeviceStorageItemInline(admin.TabularInline):
     model = DeviceStorageItem
-    extra = 1 # Number of empty forms to display
+    extra = 1 
     fields = ('sno', 'quantity', 'description', 'rackNo', 'remarks')
 
 @admin.register(DeviceStorageEntry)
 class DeviceStorageEntryAdmin(admin.ModelAdmin):
-    list_display = ('submitter_name', 'date', 'company_name', 'submitter_company_name', 'created_at')
-    list_filter = ('date', 'company_name', 'submitter_company_name')
-    search_fields = ('submitter_name', 'company_name', 'items__description')
+    list_display = (
+        'submitter_name', 
+        'location', 
+        'date', 
+        'company_name', 
+        'created_by_name', 
+        'created_by_email',
+        'created_at'
+    )
+    list_filter = ('location', 'date', 'company_name', 'submitter_company_name', 'created_by_name', 'created_by_email')
+    search_fields = ('location__name', 'submitter_name', 'company_name', 'items__description', 'created_by_name', 'created_by_email')
     inlines = [DeviceStorageItemInline]
-    date_hierarchy = 'date'
+    date_hierarchy = 'date' 
+    
     fieldsets = (
         ("Entry Details", {
-            'fields': ('company_name', 'date', 'office_address')
+            'fields': ('location', 'company_name', 'date', 'office_address')
         }),
         ("Submitter Information", {
             'fields': ('submitter_name', 'submitter_company_name', 'submitter_designation', 'submitter_contact')
@@ -23,12 +33,16 @@ class DeviceStorageEntryAdmin(admin.ModelAdmin):
         ("Signatures", {
             'fields': ('submitter_signature', 'prepared_by_signature')
         }),
+        ("Record Creator Information", { 
+            'fields': ('created_by_name', 'created_by_email'),
+            'classes': ('collapse',), 
+        }),
         ("Timestamps", {
             'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
+            'classes': ('collapse',) 
         }),
     )
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'created_by_name', 'created_by_email') # Explicitly add if editable=False isn't enough for some views
 
 class GatePassItemInline(admin.TabularInline):
     model = GatePassItem
@@ -37,21 +51,37 @@ class GatePassItemInline(admin.TabularInline):
 
 @admin.register(GatePass)
 class GatePassAdmin(admin.ModelAdmin):
-    list_display = ('recipient_name', 'pass_date', 'prepared_by', 'approved_by', 'created_at')
-    list_filter = ('pass_date', 'prepared_by', 'approved_by')
-    search_fields = ('recipient_name', 'prepared_by', 'approved_by', 'items__itemName')
+    list_display = (
+        'recipient_name', 
+        'location', 
+        'pass_date', 
+        'prepared_by', 
+        'approved_by', 
+        'created_by_name', 
+        'created_by_email',
+        'created_at'
+    )
+    list_filter = ('location', 'pass_date', 'prepared_by', 'approved_by', 'created_by_name', 'created_by_email')
+    search_fields = ('location__name', 'recipient_name', 'prepared_by', 'approved_by', 'items__itemName', 'created_by_name', 'created_by_email')
     inlines = [GatePassItemInline]
-    date_hierarchy = 'pass_date'
+    date_hierarchy = 'pass_date' 
+    
     fieldsets = (
         ("Recipient Details", {
-            'fields': ('recipient_name', 'recipient_address')
+            'fields': ('location', 'recipient_name', 'recipient_address', 'pass_date') 
         }),
         ("Approval Information", {
             'fields': ('prepared_by', 'received_by', 'approved_by')
         }),
+        ("Record Creator Information", { 
+            'fields': ('created_by_name', 'created_by_email'),
+            'classes': ('collapse',), 
+        }),
         ("Timestamps", {
-            'fields': ('pass_date', 'created_at', 'updated_at'),
-            'classes': ('collapse',)
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',) 
         }),
     )
-    readonly_fields = ('pass_date', 'created_at', 'updated_at') # pass_date is auto
+    readonly_fields = ('created_at', 'updated_at', 'created_by_name', 'created_by_email') # Explicitly add
+
+# <<<< END OF FILE forms_module/admin.py >>>>

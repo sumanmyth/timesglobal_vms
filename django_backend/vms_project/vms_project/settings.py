@@ -1,23 +1,12 @@
+# <<<< START OF FILE vms_project/settings.py >>>>
 import os
 from pathlib import Path
 from datetime import timedelta
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-your-default-secret-key-here') # Replace in production
-
-# SECURITY WARNING: don't run with debug turned on in production!
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-your-default-secret-key-here-for-locations')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
-
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.55.61','192.168.1.71'] # Add your production domain here
-
-
-# Application definition
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.55.61', '192.168.55.193', '192.168.1.71', '192.168.69.202','192.168.18.120']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -27,24 +16,23 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
 
-    # Local apps
     'users.apps.UsersConfig',
     'visitors.apps.VisitorsConfig',
     'forms_module.apps.FormsModuleConfig',
     'images.apps.ImagesConfig',
-    'task_management.apps.TaskManagementConfig', 
+    'task_management.apps.TaskManagementConfig',
+    'locations.apps.LocationsConfig', 
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware', # Should be placed high, especially before CommonMiddleware
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -72,143 +60,95 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'vms_project.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'vms_db'),
+        'NAME': os.environ.get('DB_NAME', 'vms_db'), # Consider new DB name or migration strategy
         'USER': os.environ.get('DB_USER', 'vms_user'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'Dell@12345'), # Ensure this is secure
-        'HOST': os.environ.get('DB_HOST', 'localhost'), # Or your DB host
-        'PORT': os.environ.get('DB_PORT', '5432'),      # Default PostgreSQL port
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'Dell@12345'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
-
-# If you want to use SQLite for local development (easier setup):
+# SQLite alternative for local dev:
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
+#         'NAME': BASE_DIR / 'db_locations.sqlite3', # Consider new DB name
 #     }
 # }
 
-# Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC' # Change as per your requirement, e.g., 'Asia/Kolkata'
-
+TIME_ZONE = 'UTC' # Or 'Asia/Kathmandu'
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles' # For production collectstatic
-
-# Media files (User-uploaded content)
+STATIC_ROOT = BASE_DIR / 'staticfiles_locations'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
+MEDIA_ROOT = BASE_DIR / 'media_locations'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
-# Django REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated', # Default to require authentication
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10, # Default page size for pagination
-    'DATETIME_FORMAT': "%Y-%m-%dT%H:%M:%S.%fZ", # ISO 8601 format
+    'PAGE_SIZE': 10,
+    'DATETIME_FORMAT': "%Y-%m-%dT%H:%M:%S.%fZ",
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
 }
 
-# Simple JWT settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), # Example: 1 hour
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), # Increased for easier dev
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
-
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY, # Uses Django's SECRET_KEY
+    'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
     'AUDIENCE': None,
     'ISSUER': None,
     'JWK_URL': None,
     'LEEWAY': 0,
-
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
     'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
-
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
     'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
-
     'JTI_CLAIM': 'jti',
-
     'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
-    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5), # Not used if ROTATE_REFRESH_TOKENS is False
-    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1), # Not used if ROTATE_REFRESH_TOKENS is False
+    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+
+    # Custom: Link to our custom serializer for token claims
+    'TOKEN_OBTAIN_SERIALIZER': 'users.serializers.CustomTokenObtainPairSerializer',
 }
 
-# CORS settings
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000", 
-#     "http://127.0.0.1:3000", 
-#     "http://192.168.55.61:3000",
-#     "http://192.168.55.61:5173",
-#     "http://192.168.1.71:5173"
-# ]
-CORS_ALLOW_ALL_ORIGINS = True # For development only, be more specific in production
-
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
-
-# Optional: Allow specific headers and methods if needed
-# CORS_ALLOW_HEADERS = list(default_headers) + ['my-custom-header']
-# CORS_ALLOW_METHODS = list(default_methods) + ['OPTIONS']
-
 CORS_ALLOW_HEADERS = [
     'authorization',
     'content-type',
-    # Add any other custom headers your frontend might send
+    'x-csrftoken', # If using CSRF for non-API parts or session auth alongside JWT
+    'location-id', # Example custom header frontend might send for selected location
 ]
+
+# <<<< END OF FILE vms_project/settings.py >>>>

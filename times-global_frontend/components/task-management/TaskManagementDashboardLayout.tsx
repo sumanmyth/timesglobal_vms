@@ -1,7 +1,7 @@
-
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react'; 
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Button from '../common/Button';
+import { LocationContext } from '../LocationContext'; 
 
 interface TaskManagementDashboardLayoutProps {
   onLogout: () => void;
@@ -15,6 +15,7 @@ interface SidebarNavItem {
 const TaskManagementDashboardLayout: React.FC<TaskManagementDashboardLayoutProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const { selectedLocation } = useContext(LocationContext); 
 
   const sidebarNavItems: SidebarNavItem[] = [
     { name: 'Home', path: '/task-management/home' },
@@ -24,8 +25,7 @@ const TaskManagementDashboardLayout: React.FC<TaskManagementDashboardLayoutProps
   ];
 
   const handleLogoutClick = () => {
-    onLogout();
-    navigate('/login', {replace: true});
+    onLogout(); 
   }
 
   const handleBackToDashboardClick = () => {
@@ -50,7 +50,6 @@ const TaskManagementDashboardLayout: React.FC<TaskManagementDashboardLayoutProps
           id="task-management-sidebar"
         >
           <div className="p-5 border-b border-gray-700">
-            {/* Replaced logo with text */}
             <h1 className="text-2xl font-bold text-red-600 text-center">TIMES GLOBAL</h1>
           </div>
           <nav className="flex-grow p-4 space-y-1">
@@ -71,7 +70,6 @@ const TaskManagementDashboardLayout: React.FC<TaskManagementDashboardLayoutProps
             ))}
           </nav>
           
-          {/* Logo Section Added at the bottom of the sidebar */}
           <div className="p-4 flex justify-center items-center">
             <img
               src="/images/Times Global.png"
@@ -127,7 +125,9 @@ const TaskManagementDashboardLayout: React.FC<TaskManagementDashboardLayoutProps
                   </svg>
                 )}
               </button>
-              <h2 className="text-xl font-semibold text-center flex-grow">Task Management System</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-center flex-grow">
+                Task Management ({selectedLocation?.name || 'No Location'})
+              </h2>
               <div className="w-6 md:hidden"></div> 
             </div>
           </header>

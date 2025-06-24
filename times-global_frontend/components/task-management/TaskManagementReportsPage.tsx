@@ -1,5 +1,4 @@
-
-import React, { useState }  from 'react';
+import React, { useState, useCallback }  from 'react'; // Removed useEffect as it's not used directly
 import Input from '../common/Input';
 import Button from '../common/Button';
 import { apiService } from '../../services/apiService';
@@ -36,38 +35,60 @@ const TaskManagementReportsPage: React.FC = () => {
   const [hasSearched, setHasSearched] = useState<boolean>(false);
 
 
-  const handleGenerateReport = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    setReportData([]);
-    setHasSearched(true);
-
+  const fetchReportData = useCallback(async () => { // fetchReportData is defined but only called by handleGenerateReport
     if (!fromDate || !toDate) {
-      setError('Please select both "From" and "To" dates.');
-      setIsLoading(false);
+      setError("Please select both Start Date and End Date to generate a report.");
+      setReportData([]);
+      setHasSearched(true); // Mark that an attempt was made
       return;
     }
     if (new Date(fromDate) > new Date(toDate)) {
         setError('"From" date cannot be after "To" date.');
-        setIsLoading(false);
+        setReportData([]);
+        setHasSearched(true); // Mark that an attempt was made
+        setIsLoading(false); // Ensure loading is false if returning early
         return;
     }
 
+    setIsLoading(true);
+    setError(null);
+    setHasSearched(true);
+
     try {
       const queryParams = new URLSearchParams();
-      queryParams.append('job_date__gte', fromDate);
+      // Backend expects job_date__gte and job_date__lte for date range filtering for Tasks
+      queryParams.append('job_date__gte', fromDate); 
       queryParams.append('job_date__lte', toDate);
 
+      // The /task-management/tasks/ endpoint with these params should filter by date range
+      // apiService.get will automatically append location_id if a location is selected
       const response = await apiService.get<ApiResponse<TaskReportEntry>>(`/task-management/tasks/?${queryParams.toString()}`);
-      setReportData(response.results || []);
+      
+      // Safely access response.results
+      if (response && response.results) {
+        setReportData(response.results);
+      } else {
+        setReportData([]); // Handle case where response or response.results is undefined
+      }
+
     } catch (err: any) {
       console.error('Generate Report Error:', err);
-      setError(err.data?.detail || err.message || 'Failed to generate report.');
+      const errorData = (err as { data?: any; message?: string })?.data;
+      if (errorData && typeof errorData === 'object') {
+        setError(errorData.detail || JSON.stringify(errorData) || 'Failed to generate report.');
+      } else {
+        setError((err as Error)?.message || 'Failed to generate report.');
+      }
       setReportData([]);
     } finally {
       setIsLoading(false);
     }
+  }, [fromDate, toDate]); // Dependencies for useCallback
+
+
+  const handleGenerateReport = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    fetchReportData(); // Call the memoized fetch function
   };
   
   const formatDateForDisplay = (dateString: string | null | undefined, includeTime: boolean = false): string => {
@@ -80,12 +101,15 @@ const TaskManagementReportsPage: React.FC = () => {
         if (includeTime) {
             options.hour = '2-digit';
             options.minute = '2-digit';
-            options.second = '2-digit'; 
+            // options.second = '2-digit'; // Optional: include seconds
             options.hour12 = true;
         }
-        return new Intl.DateTimeFormat('en-CA', options).format(dateObj).replace(',', '');
+        // 'en-CA' format is YYYY-MM-DD, which is good for dates.
+        // For datetime, toLocaleString with specific options can be better.
+        return new Intl.DateTimeFormat('en-CA', options).format(dateObj).replace(',', ''); 
     } catch (e) {
         console.warn("Error formatting date for display:", dateString, e);
+        // Fallback for basic YYYY-MM-DD strings if full parsing fails
         if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
             return dateString.split('T')[0]; 
         }

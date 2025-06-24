@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import Input from '../common/Input';
 import Button from '../common/Button';
@@ -63,14 +62,14 @@ const VMSReportsPage: React.FC = () => {
       });
       const data = await apiService.get<ReportEntry[] | ApiResponse<ReportEntry>>(`/visitors/report/?${queryParams.toString()}`);
       
-      let fetchedReportEntries: ReportEntry[] = Array.isArray(data) ? data : (data.results || []);
+      let fetchedReportEntries: ReportEntry[] = data ? (Array.isArray(data) ? data : (data.results || [])) : [];
 
       const reportEntriesWithImages: ReportEntry[] = await Promise.all(
         fetchedReportEntries.map(async (entry: ReportEntry) => {
           if (!entry.visitorImage && entry.fullName) { 
             try {
               const imageData = await apiService.get<StoredImage[] | ApiResponse<StoredImage>>(`/images/?search=${encodeURIComponent(entry.fullName)}`);
-              const images: StoredImage[] = Array.isArray(imageData) ? imageData : (imageData.results || []);
+              const images: StoredImage[] = imageData ? (Array.isArray(imageData) ? imageData : (imageData.results || [])) : [];
               if (images.length > 0 && images[0].imageFile) {
                 return { ...entry, visitorImage: images[0].imageFile };
               }

@@ -1,9 +1,9 @@
-
-import React, { useState, useEffect, useCallback, FormEvent } from 'react';
+import React, { useState, useEffect, useCallback, FormEvent, useContext } from 'react';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import Textarea from '../common/Textarea';
 import { apiService } from '../../services/apiService';
+import { LocationContext } from '../LocationContext';
 
 interface Task {
   id: string;
@@ -17,15 +17,15 @@ interface Task {
   company_location?: string | null;
   job_description?: string | null;
   contact?: string | null;
-  is_completed: boolean; // Added
-  completed_at?: string | null; // Added
+  is_completed: boolean; 
+  completed_at?: string | null; 
   created_at: string;
   updated_at: string;
 }
 
 interface EditTaskFormData {
   jobDate: string;
-  jobId: string;
+  jobId: string; 
   jobTitle: string;
   fullName: string;
   companyName: string;
@@ -34,12 +34,12 @@ interface EditTaskFormData {
   jobDescription: string;
   contact: string;
   encodedBy: string;
-  isCompleted: boolean; // Added
+  isCompleted: boolean; 
 }
 
 interface UpdateTaskPayload {
   job_date?: string;
-  job_id?: string;
+  job_id?: string; 
   job_title?: string;
   full_name?: string;
   company_name?: string;
@@ -48,7 +48,7 @@ interface UpdateTaskPayload {
   job_description?: string | null;
   contact?: string | null;
   encoded_by?: string;
-  is_completed?: boolean; // Added
+  is_completed?: boolean; 
 }
 
 
@@ -68,13 +68,20 @@ const initialEditFormData: EditTaskFormData = {
   jobDescription: '',
   contact: '',
   encodedBy: '',
-  isCompleted: false, // Added
+  isCompleted: false, 
 };
 
 const TaskManagementListPage: React.FC = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { selectedLocation } = useContext(LocationContext);
+
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [isLoadingAllTasks, setIsLoadingAllTasks] = useState<boolean>(true);
+  const [allTasksError, setAllTasksError] = useState<string | null>(null);
+
+  const [recentTasks, setRecentTasks] = useState<Task[]>([]);
+  const [isLoadingRecentTasks, setIsLoadingRecentTasks] = useState<boolean>(true);
+  const [recentTasksError, setRecentTasksError] = useState<string | null>(null);
+  
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
@@ -84,24 +91,76 @@ const TaskManagementListPage: React.FC = () => {
   const [editError, setEditError] = useState<string | null>(null);
 
 
-  const fetchTasks = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const fetchAllTasks = useCallback(async () => {
+    if (!selectedLocation?.id) {
+        setAllTasks([]);
+        setIsLoadingAllTasks(false);
+        setAllTasksError("Please select a location to view all tasks.");
+        return;
+    }
+    setIsLoadingAllTasks(true);
+    setAllTasksError(null);
     try {
       const response = await apiService.get<ApiResponse<Task>>('/task-management/tasks/');
-      setTasks(response.results || []);
+      if (response && response.results) {
+        setAllTasks(response.results);
+      } else {
+        setAllTasks([]); 
+      }
     } catch (err: any) {
-      console.error('Fetch Tasks Error:', err);
-      setError(err.data?.detail || err.message || 'Failed to fetch tasks.');
-      setTasks([]);
+      console.error('Fetch All Tasks Error:', err);
+      setAllTasksError(err.data?.detail || err.message || 'Failed to fetch all tasks.');
+      setAllTasks([]);
     } finally {
-      setIsLoading(false);
+      setIsLoadingAllTasks(false);
     }
-  }, []);
+  }, [selectedLocation]);
+
+  const fetchRecentTasks = useCallback(async () => {
+    if (!selectedLocation?.id) {
+        setRecentTasks([]);
+        setIsLoadingRecentTasks(false);
+        setRecentTasksError("Please select a location to view recent tasks.");
+        return;
+    }
+    setIsLoadingRecentTasks(true);
+    setRecentTasksError(null);
+    try {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const queryParams = new URLSearchParams();
+      // Using created_at for "recent" for this example. Adjust if job_date is intended.
+      queryParams.append('created_at__gte', twentyFourHoursAgo);
+      
+      const response = await apiService.get<ApiResponse<Task>>(`/task-management/tasks/?${queryParams.toString()}`);
+      if (response && response.results) {
+        setRecentTasks(response.results.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      } else {
+        setRecentTasks([]);
+      }
+    } catch (err: any) {
+      console.error('Fetch Recent Tasks Error:', err);
+      setRecentTasksError(err.data?.detail || err.message || 'Failed to fetch recent tasks.');
+      setRecentTasks([]);
+    } finally {
+      setIsLoadingRecentTasks(false);
+    }
+  }, [selectedLocation]);
+
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    if(selectedLocation?.id){
+        fetchAllTasks();
+        fetchRecentTasks();
+    } else {
+        // Clear tasks if no location is selected
+        setAllTasks([]);
+        setRecentTasks([]);
+        setIsLoadingAllTasks(false);
+        setIsLoadingRecentTasks(false);
+        setAllTasksError("No location selected.");
+        setRecentTasksError("No location selected.");
+    }
+  }, [fetchAllTasks, fetchRecentTasks, selectedLocation]);
 
   const formatDateForInput = (isoDateString: string | null | undefined): string => {
     if (!isoDateString) return '';
@@ -129,7 +188,7 @@ const TaskManagementListPage: React.FC = () => {
       jobDescription: task.job_description || '',
       contact: task.contact || '',
       encodedBy: task.encoded_by,
-      isCompleted: task.is_completed, // Set initial state for checkbox
+      isCompleted: task.is_completed, 
     });
     setIsEditModalOpen(true);
     setEditError(null);
@@ -163,7 +222,7 @@ const TaskManagementListPage: React.FC = () => {
       company_location: editFormData.companyLocation || null,
       job_description: editFormData.jobDescription || null,
       contact: editFormData.contact || null,
-      is_completed: editFormData.isCompleted, // Include completion status
+      is_completed: editFormData.isCompleted, 
     };
     
     if (!payload.job_date || !payload.job_id || !payload.job_title || !payload.full_name || !payload.company_name || !payload.rack_number || !payload.encoded_by) {
@@ -173,19 +232,18 @@ const TaskManagementListPage: React.FC = () => {
     }
 
     try {
-      const updatedTask = await apiService.patch<Task>(`/task-management/tasks/${editingTask.id}/`, payload);
-      // Optimistically update the tasks list or refetch
-      setTasks(prevTasks => prevTasks.map(task => task.id === editingTask.id ? updatedTask : task));
+      await apiService.patch<Task>(`/task-management/tasks/${editingTask.id}/`, payload);
       setIsEditModalOpen(false);
       setEditingTask(null);
       setSuccessMessage('Task updated successfully!');
       setTimeout(() => setSuccessMessage(null), 3000);
-      // If counter on home page needs to be updated, consider a shared state or event bus, or refetch on Home.
-      // For now, home page will refetch its own count.
+      fetchAllTasks(); // Refetch both lists
+      fetchRecentTasks();
     } catch (err: any) {
       console.error('Update Task Error:', err);
-      if (err.data && typeof err.data === 'object') {
-        const backendErrors = Object.entries(err.data)
+      const errorData = (err as { data?: any; message?: string })?.data;
+      if (errorData && typeof errorData === 'object') {
+        const backendErrors = Object.entries(errorData)
           .map(([key, value]) => {
             const fieldName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             return `${fieldName}: ${(Array.isArray(value) ? value.join(', ') : String(value))}`;
@@ -193,7 +251,7 @@ const TaskManagementListPage: React.FC = () => {
           .join(' \n');
         setEditError(backendErrors || 'Failed to update task. Please check details.');
       } else {
-        setEditError(err.message || 'An unexpected error occurred while updating the task.');
+        setEditError((err as Error)?.message || 'An unexpected error occurred while updating the task.');
       }
     } finally {
       setIsUpdating(false);
@@ -203,16 +261,20 @@ const TaskManagementListPage: React.FC = () => {
 
   const handleDeleteTask = async (taskId: string) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
-      setError(null); 
+      setAllTasksError(null); 
+      setRecentTasksError(null);
       setSuccessMessage(null);
       try {
         await apiService.delete(`/task-management/tasks/${taskId}/`);
-        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
         setSuccessMessage('Task deleted successfully.');
         setTimeout(() => setSuccessMessage(null), 3000);
+        fetchAllTasks(); // Refetch both lists
+        fetchRecentTasks();
       } catch (err: any) {
         console.error('Delete Task Error:', err);
-        setError(`Failed to delete task: ${err.data?.detail || err.message}`);
+        const generalError = `Failed to delete task: ${err.data?.detail || err.message}`;
+        setAllTasksError(generalError); // Show error potentially in both sections or a general one
+        setRecentTasksError(generalError);
       }
     }
   };
@@ -229,10 +291,10 @@ const TaskManagementListPage: React.FC = () => {
         options.minute = '2-digit';
         options.hour12 = true;
       }
-      return new Intl.DateTimeFormat('en-CA', options).format(dateObj).replace(',',''); // en-CA gives YYYY-MM-DD
+      return new Intl.DateTimeFormat('en-CA', options).format(dateObj).replace(',',''); 
     } catch {
       if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
-        return dateString.split('T')[0];
+        return dateString.split('T')[0]; 
       }
       return dateString; 
     }
@@ -241,76 +303,84 @@ const TaskManagementListPage: React.FC = () => {
   const inputStyles = "bg-slate-600 border-slate-500 text-gray-100 placeholder-gray-400 focus:ring-red-500 focus:border-red-500";
   const labelStyles = "block text-sm font-medium text-gray-300 mb-1";
 
+  const renderTaskTable = (tasksToRender: Task[], listTitle: string) => (
+    <div className="bg-slate-700 bg-opacity-60 backdrop-blur-md shadow-md rounded-lg overflow-hidden border border-gray-700 mb-6">
+      <h3 className="text-md font-semibold text-red-400 py-2 px-6">{listTitle}</h3>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-700">
+          <thead className="bg-gray-700">
+            <tr>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Job ID</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Job Date</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Job Title</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Full Name</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Company Name</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Rack Number</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Encoded By</th>
+              <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-slate-800 divide-y divide-gray-700">
+            {tasksToRender.map((task) => (
+              <tr key={task.id} className={`hover:bg-slate-700/70 transition-colors ${task.is_completed ? 'opacity-70' : ''}`}>
+                <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{task.job_id}</td>
+                <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{formatDateForDisplay(task.job_date)}</td>
+                <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-100 font-medium max-w-xs truncate ${task.is_completed ? 'line-through' : ''}`} title={task.job_title}>{task.job_title}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm">
+                  {task.is_completed ? (
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-600 text-green-100">
+                      Completed
+                    </span>
+                  ) : (
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-500 text-yellow-100">
+                      Pending
+                    </span>
+                  )}
+                </td>
+                <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{task.full_name}</td>
+                <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 max-w-xs truncate ${task.is_completed ? 'line-through' : ''}`} title={task.company_name}>{task.company_name}</td>
+                <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{task.rack_number}</td>
+                <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{task.encoded_by}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm">
+                  <Button onClick={() => handleEditTaskClick(task)} variant="secondary" className="!py-1 !px-2 text-xs mr-1 bg-blue-600 hover:bg-blue-700 text-white">
+                    Edit
+                  </Button>
+                  <Button onClick={() => handleDeleteTask(task.id)} variant="primary" className="!py-1 !px-2 text-xs bg-red-700 hover:bg-red-800">
+                    Delete
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+       {tasksToRender.length === 0 && <p className="text-center text-gray-400 py-6">No tasks found for this category.</p>}
+    </div>
+  );
+
 
   return (
     <div className="h-full flex flex-col">
       <header className="bg-red-700 text-white py-3 px-6 shadow-md rounded-t-lg">
-        <h2 className="text-2xl font-bold text-center">Task List</h2>
+        <h2 className="text-2xl font-bold text-center">Task List ({selectedLocation?.name || 'No Location'})</h2>
       </header>
-      <div className="py-2 px-6">
-        <h3 className="text-md font-semibold text-red-400">All Tasks</h3> 
-      </div>
-      {successMessage && <p role="alert" aria-live="polite" className="mx-2 sm:mx-4 my-2 text-center text-green-300 bg-green-800/70 p-2 rounded">{successMessage}</p>}
-      {error && <p role="alert" aria-live="assertive" className="mx-2 sm:mx-4 my-2 text-center text-red-400 bg-red-900/70 p-3 rounded">{error}</p>}
       
-      <div className="flex-grow p-2 sm:p-4 bg-slate-700 bg-opacity-30 backdrop-blur-sm rounded-b-lg shadow-inner_lg overflow-x-auto">
-        {isLoading && <p className="text-center text-gray-300 py-10">Loading tasks...</p>}
-        
-        {!isLoading && !error && tasks.length === 0 && (
-          <p className="text-center text-gray-400 py-10">No tasks found.</p>
-        )}
+      {successMessage && <p role="alert" aria-live="polite" className="mx-2 sm:mx-4 my-2 text-center text-green-300 bg-green-800/70 p-2 rounded">{successMessage}</p>}
+      
+      <div className="flex-grow p-2 sm:p-4 bg-slate-700 bg-opacity-30 backdrop-blur-sm rounded-b-lg shadow-inner_lg overflow-y-auto">
+        {/* Recent Tasks Section */}
+        {isLoadingRecentTasks && <p className="text-center text-gray-300 py-10">Loading recent tasks...</p>}
+        {recentTasksError && <p role="alert" aria-live="assertive" className="mx-2 sm:mx-4 my-2 text-center text-red-400 bg-red-900/70 p-3 rounded">{recentTasksError}</p>}
+        {!isLoadingRecentTasks && !recentTasksError && renderTaskTable(recentTasks, "Tasks from Recent 24 Hours")}
 
-        {!isLoading && !error && tasks.length > 0 && (
-          <div className="bg-slate-700 bg-opacity-60 backdrop-blur-md shadow-md rounded-lg overflow-hidden border border-gray-700">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-gray-700">
-                <tr>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Job ID</th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Job Date</th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Job Title</th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Full Name</th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Company Name</th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Rack Number</th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Encoded By</th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-slate-800 divide-y divide-gray-700">
-                {tasks.map((task) => (
-                  <tr key={task.id} className={`hover:bg-slate-700/70 transition-colors ${task.is_completed ? 'opacity-70' : ''}`}>
-                    <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{task.job_id}</td>
-                    <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{formatDateForDisplay(task.job_date)}</td>
-                    <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-100 font-medium max-w-xs truncate ${task.is_completed ? 'line-through' : ''}`} title={task.job_title}>{task.job_title}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-sm">
-                      {task.is_completed ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-600 text-green-100">
-                          Completed
-                        </span>
-                      ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-500 text-yellow-100">
-                          Pending
-                        </span>
-                      )}
-                    </td>
-                    <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{task.full_name}</td>
-                    <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 max-w-xs truncate ${task.is_completed ? 'line-through' : ''}`} title={task.company_name}>{task.company_name}</td>
-                    <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{task.rack_number}</td>
-                    <td className={`px-3 py-2 whitespace-nowrap text-sm text-gray-200 ${task.is_completed ? 'line-through' : ''}`}>{task.encoded_by}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-sm">
-                      <Button onClick={() => handleEditTaskClick(task)} variant="secondary" className="!py-1 !px-2 text-xs mr-1 bg-blue-600 hover:bg-blue-700 text-white">
-                        Edit
-                      </Button>
-                      <Button onClick={() => handleDeleteTask(task.id)} variant="primary" className="!py-1 !px-2 text-xs bg-red-700 hover:bg-red-800">
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Separator */}
+        {!isLoadingRecentTasks && !isLoadingAllTasks && <hr className="my-6 border-gray-600"/>}
+
+        {/* All Tasks Section */}
+        {isLoadingAllTasks && <p className="text-center text-gray-300 py-10">Loading all tasks...</p>}
+        {allTasksError && <p role="alert" aria-live="assertive" className="mx-2 sm:mx-4 my-2 text-center text-red-400 bg-red-900/70 p-3 rounded">{allTasksError}</p>}
+        {!isLoadingAllTasks && !allTasksError && renderTaskTable(allTasks, "All Tasks")}
       </div>
 
       {isEditModalOpen && editingTask && (
@@ -327,13 +397,12 @@ const TaskManagementListPage: React.FC = () => {
           >
             <div className="flex justify-between items-center mb-4">
               <h4 id="editTaskModalTitle" className="text-xl font-semibold text-red-500">Edit Task: {editingTask.job_title}</h4>
-              <Button onClick={() => setIsEditModalOpen(false)} variant="secondary" className="!p-1.5 text-xl leading-none">&times;</Button>
+              <Button onClick={() => setIsEditModalOpen(false)} variant="secondary" className="!p-1.5 text-xl leading-none">×</Button>
             </div>
 
             {editError && <p role="alert" aria-live="assertive" className="mb-3 text-center text-red-300 bg-red-800/70 p-3 rounded whitespace-pre-wrap">{editError}</p>}
             
             <form onSubmit={handleUpdateTaskSubmit} className="space-y-3 overflow-y-auto flex-grow pr-1">
-              {/* Form fields from previous version */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="editJobDate" className={labelStyles}>Job Date:<span className="text-red-400">*</span></label>
@@ -380,7 +449,6 @@ const TaskManagementListPage: React.FC = () => {
                 <label htmlFor="editEncodedBy" className={labelStyles}>Encoded By:<span className="text-red-400">*</span></label>
                 <Input type="text" id="editEncodedBy" name="encodedBy" value={editFormData.encodedBy} onChange={handleEditFormChange} className={inputStyles} placeholder="Encoder's Name" required />
               </div>
-              {/* Checkbox for isCompleted */}
               <div className="flex items-center pt-2">
                 <input
                   id="editIsCompleted"

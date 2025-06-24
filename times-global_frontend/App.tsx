@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -21,65 +21,85 @@ import TaskManagementAddPage from './components/task-management/TaskManagementAd
 import TaskManagementListPage from './components/task-management/TaskManagementListPage';
 import TaskManagementReportsPage from './components/task-management/TaskManagementReportsPage';
 
-import { getAuthToken, removeAuthToken } from './services/tokenService';
+import { LocationContext } from './components/LocationContext';
+import LocationSelectionPage from './components/auth/LocationSelectionPage';
+import PendingApprovalPage from './components/auth/PendingApprovalPage';
+import NoLocationsPage from './components/auth/NoLocationsPage';
+
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { 
+    isAuthenticated, 
+    isApprovedByAdmin, 
+    authorizedLocations, 
+    selectedLocation, 
+    isLoadingAuth,
+    logout 
+  } = useContext(LocationContext);
 
-  useEffect(() => {
-    const token = getAuthToken();
-    if (token) {
-      setIsAuthenticated(true);
-    }
-    setIsLoading(false);
-  }, []);
-
-  const handleLoginSuccess = useCallback(() => {
-    setIsAuthenticated(true);
-  }, []);
-
-  const handleLogout = useCallback(() => {
-    removeAuthToken();
-    localStorage.removeItem('username');
-    setIsAuthenticated(false);
-  }, []);
-  
-
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading...</div>;
+  if (isLoadingAuth) {
+    return <div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading Authentication...</div>;
   }
+
+  const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
+    if (!isAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
+    if (!isApprovedByAdmin) {
+      return <Navigate to="/pending-approval" replace />;
+    }
+    if (!authorizedLocations || authorizedLocations.length === 0) {
+      return <Navigate to="/no-locations-assigned" replace />;
+    }
+    if (!selectedLocation) {
+       // If multiple locations and none selected, or only one and not auto-selected yet by context logic
+      if (authorizedLocations.length > 1) {
+        return <Navigate to="/select-location" replace />;
+      }
+      // If only one location, context should auto-select it. If still no selectedLocation, something is wrong.
+      // For safety, redirect to selection or an error page. Here, selection page.
+      return <Navigate to="/select-location" replace />;
+    }
+    return children;
+  };
+  
+  const AuthRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
+    if (isAuthenticated) {
+       if (!isApprovedByAdmin) return <Navigate to="/pending-approval" replace />;
+       if (!authorizedLocations || authorizedLocations.length === 0) return <Navigate to="/no-locations-assigned" replace />;
+       if (!selectedLocation && authorizedLocations.length > 1) return <Navigate to="/select-location" replace/>;
+       // If selectedLocation is set OR only one authorized location (which should be auto-selected by context)
+       return <Navigate to="/dashboard" replace />;
+    }
+    return children;
+  }
+
 
   return (
     <HashRouter>
       <Routes>
-        <Route 
-          path="/login" 
-          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />} 
-        />
-        <Route 
-          path="/register" 
-          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} 
-        />
+        <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
+        <Route path="/register" element={<AuthRoute><RegisterPage /></AuthRoute>} />
         
         <Route 
-          path="/dashboard" 
-          element={isAuthenticated ? <DashboardPage onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
+          path="/pending-approval" 
+          element={isAuthenticated && !isApprovedByAdmin ? <PendingApprovalPage onLogout={logout} /> : <Navigate to="/login" replace />} 
         />
         <Route 
-          path="/dashboard/device-storage" 
-          element={isAuthenticated ? <DeviceStorageForm onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
+          path="/no-locations-assigned" 
+          element={isAuthenticated && isApprovedByAdmin && (!authorizedLocations || authorizedLocations.length === 0) ? <NoLocationsPage onLogout={logout} /> : <Navigate to="/login" replace />} 
         />
         <Route 
-          path="/dashboard/gate-pass" 
-          element={isAuthenticated ? <GatePassForm onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
+          path="/select-location" 
+          element={isAuthenticated && isApprovedByAdmin && authorizedLocations && authorizedLocations.length > 1 && !selectedLocation ? <LocationSelectionPage /> : <Navigate to="/dashboard" replace /> }
         />
 
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage onLogout={logout} /></ProtectedRoute>} />
+        <Route path="/dashboard/device-storage" element={<ProtectedRoute><DeviceStorageForm onLogout={logout} /></ProtectedRoute>} />
+        <Route path="/dashboard/gate-pass" element={<ProtectedRoute><GatePassForm onLogout={logout} /></ProtectedRoute>} />
+
         {/* VMS Routes */}
-        <Route 
-          path="/vms" 
-          element={isAuthenticated ? <VMSDashboardLayout onLogout={handleLogout} /> : <Navigate to="/login" replace />}
-        >
+        <Route path="/vms" element={<ProtectedRoute><VMSDashboardLayout onLogout={logout} /></ProtectedRoute>}>
           <Route index element={<Navigate to="home" replace />} />
           <Route path="home" element={<VMSHomePage />} />
           <Route path="add-record" element={<VMSAddRecordPage />} />
@@ -90,10 +110,7 @@ const App: React.FC = () => {
         </Route>
 
         {/* Task Management Routes */}
-        <Route
-          path="/task-management"
-          element={isAuthenticated ? <TaskManagementDashboardLayout onLogout={handleLogout} /> : <Navigate to="/login" replace />}
-        >
+        <Route path="/task-management" element={<ProtectedRoute><TaskManagementDashboardLayout onLogout={logout} /></ProtectedRoute>}>
           <Route index element={<Navigate to="home" replace />} />
           <Route path="home" element={<TaskManagementHomePage />} />
           <Route path="add-task" element={<TaskManagementAddPage />} />
@@ -101,7 +118,17 @@ const App: React.FC = () => {
           <Route path="reports" element={<TaskManagementReportsPage />} />
         </Route>
 
-        <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
+        <Route 
+          path="/" 
+          element={
+            isLoadingAuth ? <div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading...</div> :
+            !isAuthenticated ? <Navigate to="/login" replace /> :
+            !isApprovedByAdmin ? <Navigate to="/pending-approval" replace /> :
+            (!authorizedLocations || authorizedLocations.length === 0) ? <Navigate to="/no-locations-assigned" replace /> :
+            !selectedLocation && authorizedLocations.length > 1 ? <Navigate to="/select-location" replace /> :
+            <Navigate to="/dashboard" replace />
+          } 
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>

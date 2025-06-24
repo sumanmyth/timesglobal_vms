@@ -1,4 +1,3 @@
-# <<<< START OF FILE forms_module/views.py >>>>
 from rest_framework import viewsets
 from .models import DeviceStorageEntry, GatePass
 from .serializers import DeviceStorageEntrySerializer, GatePassSerializer
@@ -68,5 +67,3 @@ class DeviceStorageEntryViewSet(BaseLocationScopedViewSet):
 class GatePassViewSet(BaseLocationScopedViewSet):
     queryset = GatePass.objects.all().order_by('-pass_date')
     serializer_class = GatePassSerializer
-
-# <<<< END OF FILE forms_module/views.py >>>>

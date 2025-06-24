@@ -1,4 +1,3 @@
-# <<<< START OF FILE vms_project/settings.py >>>>
 import os
 from pathlib import Path
 from datetime import timedelta
@@ -150,5 +149,3 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken', # If using CSRF for non-API parts or session auth alongside JWT
     'location-id', # Example custom header frontend might send for selected location
 ]
-
-# <<<< END OF FILE vms_project/settings.py >>>>

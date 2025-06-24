@@ -1,4 +1,3 @@
-# <<<< START OF FILE users/views.py >>>>
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -39,5 +38,3 @@ class UserDetailView(generics.RetrieveAPIView):
     def get_object(self):
         # Returns the current logged-in user's details
         return self.request.user
-
-# <<<< END OF FILE users/views.py >>>>

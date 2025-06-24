@@ -1,4 +1,3 @@
-# <<<< START OF FILE forms_module/admin.py >>>>
 from django.contrib import admin
 from .models import DeviceStorageEntry, DeviceStorageItem, GatePass, GatePassItem
 
@@ -83,5 +82,3 @@ class GatePassAdmin(admin.ModelAdmin):
         }),
     )
     readonly_fields = ('created_at', 'updated_at', 'created_by_name', 'created_by_email') # Explicitly add
-
-# <<<< END OF FILE forms_module/admin.py >>>>

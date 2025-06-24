@@ -1,4 +1,3 @@
-# <<<< START OF FILE forms_module/serializers.py >>>>
 from rest_framework import serializers
 from .models import DeviceStorageEntry, DeviceStorageItem, GatePass, GatePassItem
 from locations.models import Location 
@@ -123,5 +122,3 @@ class GatePassSerializer(serializers.ModelSerializer):
                 GatePassItem.objects.create(gate_pass=instance, **item_data)
         
         return instance
-
-# <<<< END OF FILE forms_module/serializers.py >>>>

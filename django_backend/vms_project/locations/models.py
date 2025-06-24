@@ -1,4 +1,3 @@
-# <<<< START OF FILE locations/models.py >>>>
 from django.db import models
 
 class Location(models.Model):
@@ -14,5 +13,3 @@ class Location(models.Model):
         ordering = ['name']
         verbose_name = "Data Center Location"
         verbose_name_plural = "Data Center Locations"
-
-# <<<< END OF FILE locations/models.py >>>>

@@ -1,4 +1,3 @@
-# <<<< START OF FILE visitors/admin.py >>>>
 from django.contrib import admin
 from .models import Visitor
 
@@ -36,5 +35,3 @@ class VisitorAdmin(admin.ModelAdmin):
             if 'checkInTime' not in readonly:
                 readonly.append('checkInTime')
         return readonly
-
-# <<<< END OF FILE visitors/admin.py >>>>

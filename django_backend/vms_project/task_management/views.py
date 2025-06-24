@@ -1,4 +1,3 @@
-# <<<< START OF FILE task_management/views.py >>>>
 from rest_framework import viewsets, filters as drf_filters, status # Renamed 'filters' to avoid conflict
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -106,5 +105,3 @@ class TaskViewSet(BaseLocationScopedViewSet): # Inherit from BaseLocationScopedV
             
         count = Task.objects.filter(**query_filters).count()
         return Response({'count': count}, status=status.HTTP_200_OK)
-
-# <<<< END OF FILE task_management/views.py >>>>

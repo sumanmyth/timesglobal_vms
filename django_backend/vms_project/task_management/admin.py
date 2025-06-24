@@ -1,4 +1,3 @@
-# <<<< START OF FILE task_management/admin.py >>>>
 from django.contrib import admin
 from .models import Task
 
@@ -50,5 +49,3 @@ class TaskAdmin(admin.ModelAdmin):
     # job_id, created_by_name, created_by_email are editable=False in model.
     # completed_at is handled by view logic.
     readonly_fields = ('job_id', 'completed_at', 'created_by_name', 'created_by_email', 'created_at', 'updated_at')
-
-# <<<< END OF FILE task_management/admin.py >>>>

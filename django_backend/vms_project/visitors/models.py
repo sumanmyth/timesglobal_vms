@@ -1,4 +1,3 @@
-# <<<< START OF FILE visitors/models.py >>>>
 from django.db import models
 from django.utils import timezone
 from locations.models import Location # Import Location model
@@ -40,5 +39,3 @@ class Visitor(models.Model):
         ordering = ['-checkInTime']
         verbose_name = "Visitor Record"
         verbose_name_plural = "Visitor Records"
-
-# <<<< END OF FILE visitors/models.py >>>>

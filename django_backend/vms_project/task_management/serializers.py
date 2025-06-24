@@ -1,4 +1,3 @@
-# <<<< START OF FILE task_management/serializers.py >>>>
 from rest_framework import serializers
 from .models import Task
 from locations.models import Location
@@ -52,5 +51,3 @@ class TaskSerializer(serializers.ModelSerializer):
     # but serializer.save() can pass them as kwargs to model.save() if they are fields on the model.
     # Since created_by_name/email are now model fields, this should work fine with the
     # BaseLocationScopedViewSet.perform_create method.
-
-# <<<< END OF FILE task_management/serializers.py >>>>

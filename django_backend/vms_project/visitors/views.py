@@ -1,4 +1,3 @@
-# <<<< START OF FILE visitors/views.py >>>>
 from rest_framework import viewsets, status, filters as drf_filters 
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -91,5 +90,3 @@ class VisitorViewSet(BaseLocationScopedViewSet):
 
         serializer = self.get_serializer(report_queryset, many=True)
         return Response(serializer.data)
-
-# <<<< END OF FILE visitors/views.py >>>>

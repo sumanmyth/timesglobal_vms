@@ -1,4 +1,3 @@
-# <<<< START OF FILE users/models.py >>>>
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 # Ensure locations.Location can be referenced. If locations app is defined, this is fine.
@@ -19,5 +18,3 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
-
-# <<<< END OF FILE users/models.py >>>>

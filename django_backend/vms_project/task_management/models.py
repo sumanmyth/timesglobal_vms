@@ -1,4 +1,3 @@
-# <<<< START OF FILE task_management/models.py >>>>
 from django.db import models
 from django.db.models import Max # For auto-incrementing job_id
 from django.utils import timezone
@@ -74,5 +73,3 @@ class Task(models.Model):
         # Make job_id unique per location. If job_id format is complex, this might need adjustment.
         # If job_id is generated purely sequentially per location, this is appropriate.
         unique_together = (('location', 'job_id'),) 
-
-# <<<< END OF FILE task_management/models.py >>>>

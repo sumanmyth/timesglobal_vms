@@ -1,4 +1,3 @@
-# <<<< START OF FILE visitors/serializers.py >>>>
 from rest_framework import serializers
 from .models import Visitor
 from locations.models import Location
@@ -28,5 +27,3 @@ class VisitorCheckoutSerializer(serializers.ModelSerializer):
         model = Visitor
         fields = ['checkOutTime']
         read_only_fields = []
-
-# <<<< END OF FILE visitors/serializers.py >>>>

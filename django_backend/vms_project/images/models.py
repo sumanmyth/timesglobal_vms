@@ -1,4 +1,3 @@
-# <<<< START OF FILE images/models.py >>>>
 # StoredImage model is kept global as per thought process (user profile images).
 # No location ForeignKey here.
 from django.db import models
@@ -31,5 +30,3 @@ class StoredImage(models.Model):
         ordering = ['-uploaded_at']
         verbose_name = "Stored Image (User Registration)"
         verbose_name_plural = "Stored Images (User Registrations)"
-
-# <<<< END OF FILE images/models.py >>>>

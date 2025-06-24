@@ -1,4 +1,3 @@
-# <<<< START OF FILE users/serializers.py >>>>
 from rest_framework import serializers
 from .models import User
 from django.contrib.auth.password_validation import validate_password
@@ -98,5 +97,3 @@ class CustomTokenObtainPairSerializer(BaseTokenObtainPairSerializer):
         }
         data['user'] = user_details
         return data
-
-# <<<< END OF FILE users/serializers.py >>>>

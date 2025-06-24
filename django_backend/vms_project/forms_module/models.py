@@ -1,4 +1,3 @@
-# <<<< START OF FILE forms_module/models.py >>>>
 from django.db import models
 from django.utils import timezone
 from locations.models import Location 
@@ -106,5 +105,3 @@ class GatePassItem(models.Model):
     class Meta:
         verbose_name = "Gate Pass Item"
         verbose_name_plural = "Gate Pass Items"
-
-# <<<< END OF FILE forms_module/models.py >>>>

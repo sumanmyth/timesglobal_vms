@@ -1,9 +1,9 @@
 # Times Global - Data Centre Management Suite
 ## Official Handover & Technical Documentation
 
-**Version:** 2.0.0 (Handover Document)
+**Version:** 1.0.0 (Handover Document)
 **Last Updated:** 2024-07-26
-**Original Author:** [Developer's Name]
+**Original Author:** [Suman Paneru]
 
 ---
 

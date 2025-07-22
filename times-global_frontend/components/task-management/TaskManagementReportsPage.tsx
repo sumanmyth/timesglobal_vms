@@ -21,11 +21,6 @@ interface TaskReportEntry {
   updated_at: string;
 }
 
-interface ApiResponse<T> {
-  results?: T[];
-  [key: string]: any;
-}
-
 const TaskManagementReportsPage: React.FC = () => {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
@@ -62,14 +57,9 @@ const TaskManagementReportsPage: React.FC = () => {
 
       // The /task-management/tasks/ endpoint with these params should filter by date range
       // apiService.get will automatically append location_id if a location is selected
-      const response = await apiService.get<ApiResponse<TaskReportEntry>>(`/task-management/tasks/?${queryParams.toString()}`);
+      const reportEntries = await apiService.getAll<TaskReportEntry>(`/task-management/tasks/?${queryParams.toString()}`);
       
-      // Safely access response.results
-      if (response && response.results) {
-        setReportData(response.results);
-      } else {
-        setReportData([]); // Handle case where response or response.results is undefined
-      }
+      setReportData(reportEntries || []);
 
     } catch (err: any) {
       console.error('Generate Report Error:', err);

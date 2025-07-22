@@ -42,12 +42,6 @@ interface PreRegisteredUser {
   // Other fields from StoredImage if needed, but only contact is used here
 }
 
-interface ApiResponse<T> {
-  results?: T[];
-  [key: string]: any; 
-}
-
-
 const initialFormData: TaskFormData = {
   jobDate: '',
   // jobId: '', // Removed
@@ -98,8 +92,7 @@ const TaskManagementAddPage: React.FC = () => {
     setUserLookupError(null);
     setIsUserFoundForContact(null); 
     try {
-      const data = await apiService.get<PreRegisteredUser[] | ApiResponse<PreRegisteredUser>>(`/images/?search=${encodeURIComponent(name)}`);
-      const users: PreRegisteredUser[] = Array.isArray(data) ? data : (data?.results || []);
+      const users = await apiService.getAll<PreRegisteredUser>(`/images/?search=${encodeURIComponent(name)}`);
       
       if (users.length > 0) {
         const foundUser = users[0];

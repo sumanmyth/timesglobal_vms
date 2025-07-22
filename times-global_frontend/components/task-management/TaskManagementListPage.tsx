@@ -51,12 +51,6 @@ interface UpdateTaskPayload {
   is_completed?: boolean; 
 }
 
-
-interface ApiResponse<T> {
-  results?: T[];
-  [key: string]: any;
-}
-
 const initialEditFormData: EditTaskFormData = {
   jobDate: '',
   jobId: '',
@@ -101,12 +95,8 @@ const TaskManagementListPage: React.FC = () => {
     setIsLoadingAllTasks(true);
     setAllTasksError(null);
     try {
-      const response = await apiService.get<ApiResponse<Task>>('/task-management/tasks/');
-      if (response && response.results) {
-        setAllTasks(response.results);
-      } else {
-        setAllTasks([]); 
-      }
+      const tasks = await apiService.getAll<Task>('/task-management/tasks/');
+      setAllTasks(tasks || []);
     } catch (err: any) {
       console.error('Fetch All Tasks Error:', err);
       setAllTasksError(err.data?.detail || err.message || 'Failed to fetch all tasks.');
@@ -131,11 +121,11 @@ const TaskManagementListPage: React.FC = () => {
       // Using created_at for "recent" for this example. Adjust if job_date is intended.
       queryParams.append('created_at__gte', twentyFourHoursAgo);
       
-      const response = await apiService.get<ApiResponse<Task>>(`/task-management/tasks/?${queryParams.toString()}`);
-      if (response && response.results) {
-        setRecentTasks(response.results.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      const tasks = await apiService.getAll<Task>(`/task-management/tasks/?${queryParams.toString()}`);
+      if (tasks) {
+         setRecentTasks(tasks.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       } else {
-        setRecentTasks([]);
+         setRecentTasks([]);
       }
     } catch (err: any) {
       console.error('Fetch Recent Tasks Error:', err);

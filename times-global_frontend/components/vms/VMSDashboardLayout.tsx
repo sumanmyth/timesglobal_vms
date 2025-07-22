@@ -30,11 +30,6 @@ interface StatDisplayItem {
     value: string | number;
 }
 
-interface ApiResponse<T> {
-  results?: T[];
-  [key: string]: any; 
-}
-
 const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,8 +72,7 @@ const VMSDashboardLayout: React.FC<VMSDashboardLayoutProps> = ({ onLogout }) => 
         check_in_time_before: todayEnd.toISOString(),
       });
 
-      const data = await apiService.get<VisitorStat[] | ApiResponse<VisitorStat>>(`/visitors/?${queryParams.toString()}`);
-      const todaysVisitors: VisitorStat[] = Array.isArray(data) ? data : (data?.results || []);
+      const todaysVisitors = await apiService.getAll<VisitorStat>(`/visitors/?${queryParams.toString()}`);
 
       let unexitedCount = 0;
       let exitedCount = 0;

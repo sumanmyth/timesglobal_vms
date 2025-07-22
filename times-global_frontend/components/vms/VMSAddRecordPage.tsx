@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useContext } from 'react'; 
+import React, { useState, useCallback, useContext } from 'react'; // Added useContext
 import Input from '../common/Input';
 import Textarea from '../common/Textarea';
 import Button from '../common/Button';
 import { apiService } from '../../services/apiService';
-import { LocationContext } from '../LocationContext'; 
+import { LocationContext } from '../LocationContext'; // Import LocationContext
 
 interface FormData {
   idNumberType: string;
@@ -24,12 +24,6 @@ interface PreRegisteredUser {
   email?: string;   
   imageFile?: string; 
 }
-
-interface ApiResponse<T> {
-  results?: T[];
-  [key: string]: any; 
-}
-
 
 const VMSAddRecordPage: React.FC = () => {
   const initialFormData: FormData = {
@@ -84,14 +78,13 @@ const VMSAddRecordPage: React.FC = () => {
     setIsUserPreRegistered(null); 
     try {
       // Image search endpoint should not be location-scoped by default as images are global
-      const data = await apiService.get<PreRegisteredUser[] | ApiResponse<PreRegisteredUser>>(`/images/?search=${encodeURIComponent(name)}`);
-      const users: PreRegisteredUser[] = Array.isArray(data) ? data : (data?.results || []);
+      const users = await apiService.getAll<PreRegisteredUser>(`/images/?search=${encodeURIComponent(name)}`);
       
       if (users.length > 0) {
         const foundUser = users[0];
         setFormData((prev: FormData) => ({
           ...prev,
-          fullName: prev.fullName, 
+          fullName: foundUser.fullName, 
           idNumberType: foundUser.idType || '',
           contact: foundUser.contact || '', 
           email: foundUser.email || '',   

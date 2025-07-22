@@ -12,11 +12,6 @@ interface RegisteredUser {
   email?: string;   
 }
 
-interface ApiResponse<T> {
-  results?: T[];
-  [key: string]: any; 
-}
-
 const idTypes: string[] = ['Visitor', 'Staff', 'Contractor', 'Other'];
 
 const VMSUserRegistrationPage: React.FC = () => { 
@@ -65,8 +60,8 @@ const VMSUserRegistrationPage: React.FC = () => {
     try {
       const queryParams = new URLSearchParams();
       if (searchTerm) queryParams.append('search', searchTerm);
-      const data = await apiService.get<RegisteredUser[] | ApiResponse<RegisteredUser>>(`/images/?${queryParams.toString()}`);
-      setRegisteredUsers(Array.isArray(data) ? data : (data?.results || []));
+      const users = await apiService.getAll<RegisteredUser>(`/images/?${queryParams.toString()}`);
+      setRegisteredUsers(users);
     } catch (err: any) {
       console.error('Fetch Registered Users Error:', err);
       setTableError(err.data?.detail || err.message || 'Failed to fetch registered users.');

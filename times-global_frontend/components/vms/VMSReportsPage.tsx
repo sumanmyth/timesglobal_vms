@@ -25,11 +25,6 @@ interface StoredImage {
   idType: string;
 }
 
-interface ApiResponse<T> {
-  results?: T[];
-  [key:string]: any;
-}
-
 const VMSReportsPage: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -60,16 +55,13 @@ const VMSReportsPage: React.FC = () => {
         start_date: startDate, 
         end_date: endDate,
       });
-      const data = await apiService.get<ReportEntry[] | ApiResponse<ReportEntry>>(`/visitors/report/?${queryParams.toString()}`);
+      const fetchedReportEntries = await apiService.getAll<ReportEntry>(`/visitors/report/?${queryParams.toString()}`);
       
-      let fetchedReportEntries: ReportEntry[] = data ? (Array.isArray(data) ? data : (data.results || [])) : [];
-
       const reportEntriesWithImages: ReportEntry[] = await Promise.all(
         fetchedReportEntries.map(async (entry: ReportEntry) => {
           if (!entry.visitorImage && entry.fullName) { 
             try {
-              const imageData = await apiService.get<StoredImage[] | ApiResponse<StoredImage>>(`/images/?search=${encodeURIComponent(entry.fullName)}`);
-              const images: StoredImage[] = imageData ? (Array.isArray(imageData) ? imageData : (imageData.results || [])) : [];
+              const images = await apiService.getAll<StoredImage>(`/images/?search=${encodeURIComponent(entry.fullName)}`);
               if (images.length > 0 && images[0].imageFile) {
                 return { ...entry, visitorImage: images[0].imageFile };
               }

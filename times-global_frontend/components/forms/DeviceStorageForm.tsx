@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useContext } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import Input from '../common/Input';
@@ -43,12 +45,6 @@ interface DeviceStorageResponseData {
   created_at?: string;
   updated_at?: string;
 }
-
-interface ApiResponse<T> {
-  results?: T[];
-  [key: string]: any;
-}
-
 
 const DeviceStorageForm: React.FC<DeviceStorageFormProps> = ({ onLogout }) => {
   const navigate = useNavigate();
@@ -357,8 +353,8 @@ const DeviceStorageForm: React.FC<DeviceStorageFormProps> = ({ onLogout }) => {
     setIsLoadingPreviousReceipts(true);
     setPreviousReceiptsError(null);
     try {
-      const response = await apiService.get<ApiResponse<DeviceStorageResponseData>>('/device-storage/');
-      setPreviousReceipts(response?.results || []);
+      const receipts = await apiService.getAll<DeviceStorageResponseData>('/device-storage/');
+      setPreviousReceipts(receipts || []);
     } catch (err: any) {
       console.error('Fetch Previous Receipts Error:', err);
       setPreviousReceiptsError(err.message || 'Failed to fetch previous receipts.');

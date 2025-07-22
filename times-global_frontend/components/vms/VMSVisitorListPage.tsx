@@ -26,11 +26,6 @@ interface StoredImage {
   idType: string;
 }
 
-interface ApiResponse<T> {
-  results?: T[];
-  [key: string]: any; 
-}
-
 const VMSVisitorListPage: React.FC = () => {
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
@@ -67,8 +62,7 @@ const VMSVisitorListPage: React.FC = () => {
         if (!visitor.visitorImage && visitor.fullName) { 
           try {
             // Image search should not be location-scoped, assuming images are global
-            const imageData = await apiService.get<StoredImage[] | ApiResponse<StoredImage>>(`/images/?search=${encodeURIComponent(visitor.fullName)}`);
-            const images: StoredImage[] = Array.isArray(imageData) ? imageData : (imageData?.results || []);
+            const images = await apiService.getAll<StoredImage>(`/images/?search=${encodeURIComponent(visitor.fullName)}`);
             if (images.length > 0 && images[0].imageFile) {
               return { ...visitor, visitorImage: images[0].imageFile };
             }
@@ -100,8 +94,7 @@ const VMSVisitorListPage: React.FC = () => {
       queryParams.append('check_in_time_after', todayStart);
       queryParams.append('check_in_time_before', todayEnd);
       
-      const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
-      let fetchedTodaysVisitors: Visitor[] = Array.isArray(data) ? data : (data?.results || []);
+      const fetchedTodaysVisitors = await apiService.getAll<Visitor>(`/visitors/?${queryParams.toString()}`);
       
       const visitorsWithImages = await enrichVisitorsWithImages(fetchedTodaysVisitors);
       setTodaysVisitors(visitorsWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));
@@ -137,8 +130,7 @@ const VMSVisitorListPage: React.FC = () => {
       if (dateTo) queryParams.append('check_in_time_before', dateTo + "T23:59:59Z");   
       if (searchName) queryParams.append('search', searchName); 
 
-      const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
-      let fetchedVisitors: Visitor[] = Array.isArray(data) ? data : (data?.results || []);
+      const fetchedVisitors = await apiService.getAll<Visitor>(`/visitors/?${queryParams.toString()}`);
       
       const visitorsWithImages = await enrichVisitorsWithImages(fetchedVisitors);
       setVisitors(visitorsWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));
@@ -205,8 +197,7 @@ const VMSVisitorListPage: React.FC = () => {
     try {
       // apiService will append location_id for the /visitors/ endpoint
       const queryParams = new URLSearchParams({ search: visitor.fullName });
-      const data = await apiService.get<Visitor[] | ApiResponse<Visitor>>(`/visitors/?${queryParams.toString()}`);
-      let historyEntries: Visitor[] = Array.isArray(data) ? data : (data?.results || []);
+      const historyEntries = await apiService.getAll<Visitor>(`/visitors/?${queryParams.toString()}`);
 
       const historyWithImages = await enrichVisitorsWithImages(historyEntries);
       setVisitorHistory(historyWithImages.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime()));

@@ -1,7 +1,7 @@
 import { getAuthToken, setAuthToken, getRefreshToken, removeAuthToken } from './tokenService';
 import { LocationInfo } from '../components/LocationContext'; // Import LocationInfo
 
-const BASE_URL = 'http://192.168.55.193:8000/api'; 
+const BASE_URL = 'http://192.168.55.83:8000/api'; 
 
 interface ApiErrorData {
   detail?: string;
@@ -19,6 +19,14 @@ class ApiError extends Error {
     this.data = data;
     this.status = status;
   }
+}
+
+// For paginated responses from Django Rest Framework
+interface PaginatedApiResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
 }
 
 let isRefreshing = false;
@@ -192,9 +200,36 @@ async function request<T>(endpoint: string, options: RequestInit = {}, isFormDat
   return makeRequest(getAuthToken());
 }
 
+async function getAllPaginatedResults<T>(endpoint: string, options: RequestInit = {}): Promise<T[]> {
+  let results: T[] = [];
+  let nextUrl: string | null = endpoint;
+
+  while(nextUrl) {
+    // The `request` function prepends BASE_URL, so we need to pass a relative path.
+    const path: string = nextUrl.startsWith(BASE_URL) ? nextUrl.substring(BASE_URL.length) : nextUrl;
+
+    const response: PaginatedApiResponse<T> | undefined = await request<PaginatedApiResponse<T>>(path, { ...options, method: 'GET' });
+    
+    if (response && Array.isArray(response.results)) {
+      results = results.concat(response.results);
+    }
+    
+    // Check for infinite loop and break if 'next' URL is the same as the current URL.
+    if (response?.next && response.next === nextUrl) {
+      console.warn("Pagination loop detected. Breaking.");
+      nextUrl = null;
+    } else {
+      nextUrl = response?.next || null;
+    }
+  }
+  return results;
+}
+
 export const apiService = {
   get: <T>(endpoint: string, options?: RequestInit): Promise<T | undefined> => 
     request<T>(endpoint, { ...options, method: 'GET' }),
+  getAll: <T>(endpoint: string, options?: RequestInit): Promise<T[]> => 
+    getAllPaginatedResults<T>(endpoint, { ...options, method: 'GET' }),
   post: <T>(endpoint: string, body: any, isFormData: boolean = false, options?: RequestInit): Promise<T | undefined> => 
     request<T>(endpoint, { ...options, method: 'POST', body: isFormData ? body : JSON.stringify(body) }, isFormData),
   put: <T>(endpoint: string, body: any, isFormData: boolean = false, options?: RequestInit): Promise<T | undefined> => 
